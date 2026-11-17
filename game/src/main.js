@@ -281,7 +281,10 @@ function wireButtons() {
   document.getElementById('btntitle2').addEventListener('click', () => showScreen('title'));
   window.addEventListener('keydown', (e) => {
     if (e.code === 'Enter' && G.screen === 'title') startGame(true);
-    else if (e.code === 'Escape' && G.screen === 'paused') showScreen('play');
+    else if (e.code === 'Escape' && G.screen === 'paused') {
+      showScreen('play');
+      input.takePressed(); // swallow this Escape so the next step doesn't re-pause
+    }
   });
 }
 

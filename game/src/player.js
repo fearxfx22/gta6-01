@@ -51,8 +51,10 @@ export function createPlayer(scene, world) {
   return {
     mesh, pos, get heading() { return heading; }, get health() { return health; },
     get dead() { return dead; }, get speed() { return Math.hypot(vel.x, vel.z); },
+    setHeading(h) { heading = h; mesh.rotation.y = h; },
     reset(x, z) {
       pos.set(x, 0, z);
+      mesh.position.copy(pos);
       vel.set(0, 0, 0);
       vy = 0; health = PLAYER.health; dead = false; lastHurt = -99;
     },
