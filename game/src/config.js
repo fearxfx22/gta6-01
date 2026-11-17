@@ -1,61 +1,73 @@
-// Every tuning number and colour in one place. The playfield is a fixed 1280x720 logical area;
-// the renderer scales it to the window, so no rule below depends on the screen size.
-
-export const FIELD = { width: 1280, height: 720, groundY: 664 };
-
-/** The simulation's fixed step, in seconds: 60 updates a second whatever the display's rate. */
-export const STEP = 1 / 60;
+// Solmar Bay tuning: every number the game balances on lives here.
+export const WORLD = {
+  block: 46,          // block interior size (m)
+  road: 14,           // road width (m)
+  pitch: 60,          // block + road
+  grid: 7,            // roads per axis
+  half: 210,          // city half-extent (m)
+  beachX: 236,        // sand starts here
+  oceanX: 268,        // water starts here
+  docksZ: -236,       // container yard starts here (north)
+  marinaZ: 236,       // marina / lighthouse strip (south)
+};
 
 export const PLAYER = {
-  width: 72,
-  height: 24,
-  speed: 560,
-  invulnerable: 1.5,
+  walkSpeed: 4.6,
+  sprintSpeed: 8.2,
+  accel: 42,
+  jumpSpeed: 7.5,
+  gravity: 22,
+  radius: 0.55,
+  health: 100,
+  regenDelay: 5,
+  regenRate: 9,
 };
 
-export const LIVES = 3;
-
-export const BLOCK = {
-  minWidth: 40,
-  maxWidth: 110,
-  height: 36,
-  speed: 240,
-  speedPerLevel: 30,
-  speedJitter: 90,
-  interval: 0.55,
-  intervalScale: 0.88,
-  minInterval: 0.14,
-  dodgePoints: 1,
+export const CAR = {
+  accel: 15,
+  brake: 34,
+  reverseAccel: 10,
+  maxSpeed: 37,
+  maxSport: 47,
+  maxReverse: 12,
+  steerMax: 0.55,
+  steerSpeed: 3.2,
+  grip: 8.5,
+  driftGrip: 3.2,
+  radius: 2.3,
 };
 
-export const COIN = {
-  size: 24,
-  speed: 190,
-  speedPerLevel: 14,
-  interval: 1.4,
-  intervalJitter: 0.8,
-  points: 10,
+export const WANTED = {
+  maxStars: 5,
+  decaySeconds: 26,   // unseen this long -> lose one star
+  stealCar: 1,         // stealing a parked car
+  jackCar: 1,          // jacking a moving car
+  hitPed: 1,
+  shootPed: 1,
+  killCop: 1,
+  shootCop: 1,
 };
 
-/** Seconds of play per level, and the last level: speeds and spawn rates stop growing there. */
-export const LEVEL = { seconds: 12, max: 12 };
-
-/** How many falling things can exist at once; the pool is allocated once, at boot. */
-export const POOL_SIZE = 64;
-
-export const PALETTE = {
-  backdrop: '#11141b',
-  sky: '#1b1f2a',
-  ground: '#2a3040',
-  player: '#4fc3f7',
-  block: '#e5534b',
-  coin: '#f2c94c',
-  panel: '#252b38',
-  text: '#eef1f5',
-  muted: '#8b93a3',
+export const POLICE = {
+  maxCars: 10,
+  spawnDist: 70,
+  despawnDist: 190,
+  chaseSpeed: 34,
+  ramDamage: 6,
+  bustDist: 2.4,       // cop this close on foot starts the arrest
+  bustTime: 2.2,
 };
 
-export const FONT = 'system-ui, -apple-system, "Segoe UI", sans-serif';
+export const COMBAT = {
+  pistolDamage: 34,
+  headshotMult: 2,
+  fireInterval: 0.16,
+  range: 90,
+  spread: 0.012,
+  enemyDamage: 9,
+  enemyInterval: 0.9,
+  enemyAccuracy: 0.42,
+};
 
-/** Where the best score is kept between visits (this browser only). */
-export const BEST_KEY = 'block-dodger.best';
+export const SAVE_KEY = 'solmarbay-save-v1';
+export const MISSION_REWARDS = [400, 700, 900, 1200, 2000];

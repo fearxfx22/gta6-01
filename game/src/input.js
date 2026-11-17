@@ -1,53 +1,66 @@
-// Keyboard and pointer input. Held keys give a steering direction; one-shot presses (start or
-// restart, pause) are queued as bit flags and taken once by the loop, so a press between two
-// frames is never lost and never counted twice.
+// Keyboard + mouse state. Drag orbits the camera; click fires; keys are polled
+// by the game loop. Pointer lock is never required, so headless play works too.
+export const KEY = { W: 'KeyW', A: 'KeyA', S: 'KeyS', D: 'KeyD' };
 
-export const ACTION_CONFIRM = 1;
-export const ACTION_PAUSE = 2;
+export function createInput(canvas) {
+  const keys = new Set();
+  const pressed = new Set(); // edge-triggered, consumed by takePressed()
+  let dragDX = 0, dragDY = 0, wheel = 0;
+  let dragging = false, lastX = 0, lastY = 0;
+  let mouseDown = false;
 
-const LEFT = new Set(['ArrowLeft', 'KeyA']);
-const RIGHT = new Set(['ArrowRight', 'KeyD']);
-const CONFIRM = new Set(['Space', 'Enter']);
-const PAUSE = new Set(['KeyP', 'Escape']);
+  const onKeyDown = (e) => {
+    if (e.repeat) return;
+    keys.add(e.code);
+    pressed.add(e.code);
+    if (['Space', 'ArrowUp', 'ArrowDown'].includes(e.code)) e.preventDefault();
+  };
+  const onKeyUp = (e) => keys.delete(e.code);
+  const onMouseDown = (e) => {
+    mouseDown = true;
+    if (e.button === 0) pressed.add('Mouse0');
+    dragging = true; lastX = e.clientX; lastY = e.clientY;
+  };
+  const onMouseMove = (e) => {
+    if (!dragging) return;
+    dragDX += e.clientX - lastX;
+    dragDY += e.clientY - lastY;
+    lastX = e.clientX; lastY = e.clientY;
+  };
+  const onMouseUp = () => { mouseDown = false; dragging = false; };
+  const onWheel = (e) => { wheel += e.deltaY; };
+  const onBlur = () => { keys.clear(); dragging = false; mouseDown = false; };
 
-export function createInput(target) {
-  let left = false;
-  let right = false;
-  let actions = 0;
-
-  window.addEventListener('keydown', (event) => {
-    if (LEFT.has(event.code)) left = true;
-    else if (RIGHT.has(event.code)) right = true;
-    else if (CONFIRM.has(event.code)) {
-      if (!event.repeat) actions |= ACTION_CONFIRM;
-    } else if (PAUSE.has(event.code)) {
-      if (!event.repeat) actions |= ACTION_PAUSE;
-    } else return;
-    event.preventDefault();
-  });
-  window.addEventListener('keyup', (event) => {
-    if (LEFT.has(event.code)) left = false;
-    else if (RIGHT.has(event.code)) right = false;
-  });
-  // A key released while the tab is hidden never sends keyup: let go of everything on blur.
-  window.addEventListener('blur', () => {
-    left = false;
-    right = false;
-  });
-  target.addEventListener('pointerdown', () => {
-    actions |= ACTION_CONFIRM;
-  });
+  window.addEventListener('keydown', onKeyDown);
+  window.addEventListener('keyup', onKeyUp);
+  canvas.addEventListener('mousedown', onMouseDown);
+  window.addEventListener('mousemove', onMouseMove);
+  window.addEventListener('mouseup', onMouseUp);
+  canvas.addEventListener('wheel', onWheel, { passive: true });
+  window.addEventListener('blur', onBlur);
 
   return {
-    /** -1 for left, 1 for right, 0 for neither or both. */
-    direction() {
-      return (right ? 1 : 0) - (left ? 1 : 0);
+    down: (code) => keys.has(code),
+    axis() {
+      let x = 0, z = 0;
+      if (keys.has(KEY.W) || keys.has('ArrowUp')) z -= 1;
+      if (keys.has(KEY.S) || keys.has('ArrowDown')) z += 1;
+      if (keys.has(KEY.A) || keys.has('ArrowLeft')) x -= 1;
+      if (keys.has(KEY.D) || keys.has('ArrowRight')) x += 1;
+      return { x, z };
     },
-    /** The one-shot presses since the last call, as ACTION_* flags. */
-    takeActions() {
-      const taken = actions;
-      actions = 0;
-      return taken;
+    takePressed() { const out = new Set(pressed); pressed.clear(); return out; },
+    takeDrag() { const d = { dx: dragDX, dy: dragDY }; dragDX = 0; dragDY = 0; return d; },
+    takeWheel() { const w = wheel; wheel = 0; return w; },
+    get mouseDown() { return mouseDown; },
+    dispose() {
+      window.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener('keyup', onKeyUp);
+      canvas.removeEventListener('mousedown', onMouseDown);
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', onMouseUp);
+      canvas.removeEventListener('wheel', onWheel);
+      window.removeEventListener('blur', onBlur);
     },
   };
 }
