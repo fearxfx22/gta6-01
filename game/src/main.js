@@ -5,7 +5,7 @@
 //
 // ?seed=N fixes the city layout. ?shot=title|street stages a screenshot scene
 // instead of running the loop, paints it twice and sets window.__shotReady.
-import { WORLD } from './config.js';
+import { CRASH, WANTED, WORLD } from './config.js';
 import { makeRng } from './random.js';
 import { createInput } from './input.js';
 import { buildWorld } from './world.js';
@@ -84,6 +84,22 @@ G.lastGunshot = null;
 function announce(message) { status.textContent = message; }
 G.announce = announce;
 
+// Crash feedback: car-car and car-building impacts at speed get sparks, a
+// bang and a camera shake — but at most once per cooldown, not every frame
+// the two cars overlap.
+let crashCooldown = 0;
+let dustTimer = 0;
+let skidTimer = 0;
+function onCarCrash(a, b, relSpeed) {
+  if (crashCooldown > 0 || relSpeed < CRASH.minRelSpeed) return;
+  crashCooldown = CRASH.cooldown;
+  const x = b ? (a.pos.x + b.pos.x) / 2 : a.pos.x;
+  const z = b ? (a.pos.z + b.pos.z) / 2 : a.pos.z;
+  G.effects.sparks(x, 1, z);
+  G.audio.crash();
+  G.rig.addShake(CRASH.shake);
+}
+
 const hudEl = document.getElementById('hud');
 const titleEl = document.getElementById('titlescreen');
 const pauseEl = document.getElementById('pausescreen');
@@ -132,6 +148,7 @@ G.onBusted = () => { if (G.screen === 'play') endRun('busted'); };
 G.onWasted = () => { if (G.screen === 'play') endRun('wasted'); };
 
 function startGame(fresh) {
+  input.clearPressed(); // keys hit on the title screen must not fire actions
   if (fresh) {
     G.cash = 0;
     G.wanted = 0;
@@ -181,6 +198,10 @@ function tryEnterExitCar() {
     if (car.parked) {
       G.addWanted(1);
       announce('Car stolen. The police have been called.');
+    } else if (car.driver === 'traffic' || car.driver === 'police') {
+      // Jacking a moving car in front of its driver is a louder crime.
+      G.addWanted(WANTED.jackCar);
+      announce(car.driver === 'police' ? 'You just carjacked a cop car. Bold.' : 'Carjacked. The driver is calling it in.');
     }
     G.driving = car;
     car.driver = 'player';
@@ -200,9 +221,23 @@ function step(dt) {
 
   if (G.driving) {
     const car = G.driving;
-    stepCar(car, dt, driveControl());
+    const ctrl = driveControl();
+    stepCar(car, dt, ctrl);
     player.pos.set(car.pos.x, 0, car.pos.z);
-    rig.follow(dt, { x: car.pos.x, y: 0, z: car.pos.z }, car.heading, 'car', world.colliders);
+    // Sand dust behind the wheels on the beach, and a squeal on a hard
+    // handbrake slide — both throttled so they don't spam every frame.
+    if (car.pos.x > WORLD.beachX && Math.abs(car.speed) > 10) {
+      dustTimer -= dt;
+      if (dustTimer <= 0) {
+        dustTimer = 0.16;
+        G.effects.dust(car.pos.x - Math.sin(car.heading) * 2, 0.4, car.pos.z - Math.cos(car.heading) * 2);
+      }
+    }
+    if (ctrl.handbrake && Math.abs(car.speed) > 12) {
+      skidTimer -= dt;
+      if (skidTimer <= 0) { skidTimer = 0.4; G.audio.skid(); }
+    }
+    rig.follow(dt, { x: car.pos.x, y: 0, z: car.pos.z }, car.heading, 'car', world.colliders, Math.abs(car.speed) / 47);
   } else {
     player.update(dt, input, rig.yaw);
     rig.follow(dt, { x: player.pos.x, y: player.pos.y, z: player.pos.z }, player.heading, 'foot', world.colliders);
@@ -211,7 +246,8 @@ function step(dt) {
   if (drag.dx || drag.dy) rig.orbit(drag.dx, drag.dy);
   const wheel = input.takeWheel();
   if (wheel) rig.zoom(wheel);
-  vehicles.update(dt, world, null);
+  vehicles.update(dt, world, onCarCrash);
+  crashCooldown = Math.max(0, crashCooldown - dt);
   traffic.update(dt, player.pos);
   pedestrians.update(dt, {
     playerX: player.pos.x,

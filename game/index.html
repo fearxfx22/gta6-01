@@ -27,6 +27,8 @@
   #topleft { position: absolute; top: 14px; left: 14px; padding: 10px 14px; min-width: 210px; }
   #stars { font-size: 22px; letter-spacing: 3px; color: var(--gold); text-shadow: 0 0 8px rgba(255,194,75,.6); line-height: 1; }
   #stars .off { color: rgba(255,255,255,.25); text-shadow: none; }
+  #stars.max { animation: starpulse .6s infinite alternate; }
+  @keyframes starpulse { from { text-shadow: 0 0 8px rgba(255,194,75,.6); } to { text-shadow: 0 0 18px rgba(255,59,48,.95); color: #ff8a7a; } }
   #healthrow { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
   #healthbar { flex: 1; height: 10px; background: rgba(255,255,255,.18); border-radius: 6px; overflow: hidden; }
   #healthfill { height: 100%; width: 100%; background: linear-gradient(90deg, #37d67a, #a8e063); border-radius: 6px; }

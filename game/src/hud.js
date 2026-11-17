@@ -1,7 +1,7 @@
 // HUD: stars, health, cash, objective, speedometer, crosshair, toasts, banners,
 // Vera's dialogue, and the 2D minimap (roads, blips, mission marker). DOM writes
 // are cached — a value is only written when it changes.
-import { WORLD } from './config.js';
+import { MISSION_REWARDS, WORLD } from './config.js';
 
 export function createHud(G) {
   const $ = (id) => document.getElementById(id);
@@ -12,7 +12,7 @@ export function createHud(G) {
   const vignetteEl = $('vignette'), flashEl = $('wantedflash');
   const map = $('minimap').getContext('2d');
 
-  const cache = { stars: -1, health: -1, cash: -1, objective: '', dist: '', speed: -1 };
+  const cache = { stars: -1, health: -1, cash: -1, objective: '', objText: '', dist: '', speed: -1 };
   let toastTimer = 0, bannerTimer = 0, dialogueTimer = 0, hitTimer = 0, hurtTimer = 0;
   let flashPhase = 0;
 
@@ -123,12 +123,13 @@ export function createHud(G) {
     hitmarker() { hitEl.classList.add('show'); hitTimer = 0.12; },
     hurt() { hurtTimer = 0.7; },
     update(dt) {
-      // Stars.
+      // Stars (five stars pulse when the whole bay is after you).
       if (G.wanted !== cache.stars) {
         cache.stars = G.wanted;
         let s = '';
         for (let i = 0; i < 5; i += 1) s += i < G.wanted ? '★' : '<span class="off">★</span>';
         starsEl.innerHTML = s;
+        starsEl.classList.toggle('max', G.wanted >= 5);
       }
       // Health.
       const hp = Math.round(G.player.health);
@@ -141,12 +142,14 @@ export function createHud(G) {
         cache.cash = G.cash;
         cashEl.innerHTML = `$${G.cash.toLocaleString('en-US')} <small>cash</small>`;
       }
-      // Objective.
+      // Objective (name + reward) and the objective text itself: both cached,
+      // so the DOM is only touched when something actually changes.
       const m = G.missions;
-      const name = m && m.activeMission() ? m.activeMission().name : 'Free roam';
+      const active = m && m.activeMission();
+      const name = active ? `${active.name} — $${MISSION_REWARDS[m.currentIndex].toLocaleString('en-US')}` : 'Free roam';
       const obj = m ? m.objectiveText() : 'Explore Solmar Bay. Steal a car with E, lose the cops, find work.';
       if (name !== cache.objective) { cache.objective = name; missionNameEl.textContent = name; }
-      objectiveEl.textContent = obj;
+      if (obj !== cache.objText) { cache.objText = obj; objectiveEl.textContent = obj; }
       const t = m ? m.target() : null;
       const distText = t ? `${Math.round(Math.hypot(t.x - G.player.pos.x, t.z - G.player.pos.z))} m` : '';
       if (distText !== cache.dist) { cache.dist = distText; distEl.textContent = distText; }

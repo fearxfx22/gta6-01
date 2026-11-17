@@ -2,6 +2,7 @@
 // smoothing, look-ahead, pitch clamp, wheel zoom and a simple push-in when a
 // building blocks the view (camera-systems patterns, hand-rolled for three.js).
 import * as THREE from 'three';
+import { FOV_KICK } from './config.js';
 import { angleLerp, clamp, dampFactor, lerp } from './random.js';
 
 export function createRenderer(canvas) {
@@ -45,6 +46,7 @@ export function createRenderer(canvas) {
   // Camera rig state.
   let yaw = Math.PI * 0.15, pitch = 0.24, dist = 8.5;
   let trauma = 0;
+  let fov = 62; // base FOV; driving fast kicks it wider for speed feel
   let camPos = new THREE.Vector3(-140, 60, 180);
   let lookAt = new THREE.Vector3(0, 2, 0);
   const tmp = new THREE.Vector3();
@@ -66,13 +68,21 @@ export function createRenderer(canvas) {
       camera.lookAt(0, 14, 0);
     },
     // focus: {x, z, y} of the thing followed; heading: its facing (car mode
-    // eases the camera behind it); mode 'foot' | 'car' | 'fixed'.
-    follow(dt, focus, heading, mode, colliders) {
+    // eases the camera behind it); mode 'foot' | 'car' | 'fixed'; speed01 is
+    // the car's speed as a 0..1 fraction, for the FOV kick.
+    follow(dt, focus, heading, mode, colliders, speed01 = 0) {
       if (mode === 'car') {
         // Chase cam: ease yaw behind the car's heading, with look-ahead.
         yaw = angleLerp(yaw, heading + Math.PI, dampFactor(1.6, dt));
         pitch = lerp(pitch, 0.24, dampFactor(2, dt));
         dist = lerp(dist, 11.5, dampFactor(2, dt));
+      }
+      // Speed feel: the FOV widens as the car goes faster, eases back on foot.
+      const targetFov = 62 + (mode === 'car' ? clamp(speed01, 0, 1) * FOV_KICK : 0);
+      if (Math.abs(targetFov - fov) > 0.05) {
+        fov = lerp(fov, targetFov, dampFactor(2.5, dt));
+        camera.fov = fov;
+        camera.updateProjectionMatrix();
       }
       const target = tmp.set(focus.x, focus.y, focus.z);
       const lookY = mode === 'car' ? 2.2 : 1.7;

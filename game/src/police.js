@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import { POLICE, WANTED } from './config.js';
 import { makePersonMesh } from './player.js';
 import { stepCar } from './vehicles.js';
-import { clamp } from './random.js';
+import { angleDiff, clamp } from './random.js';
 
 export function createPolice(scene, world, vehicles, rng) {
   const cruisers = []; // {car}
@@ -89,25 +89,33 @@ export function createPolice(scene, world, vehicles, rng) {
         } else quietTime = 0;
       } else quietTime = 0;
 
-      // Spawn to the wanted level; stand down when it clears.
-      const wantCars = wanted === 0 ? 0 : Math.min(wanted + 1, 6);
+      // Spawn to the wanted level; stand down when it clears. The heat
+      // scales: two cruisers per star, up to the configured maximum.
+      const wantCars = wanted === 0 ? 0 : Math.min(wanted * 2, POLICE.maxCars);
       while (cruisers.length < wantCars) spawnCruiser(player.pos);
-      while (cruisers.length > wantCars) removeCruiser(cruisers.length - 1);
+      // Stand down from the end, but never impound the cruiser the player
+      // is driving — that would leave them in an invisible car.
+      while (cruisers.length > wantCars) {
+        let idx = cruisers.length - 1;
+        while (idx >= 0 && cruisers[idx].car.driver === 'player') idx -= 1;
+        if (idx < 0) break;
+        removeCruiser(idx);
+      }
       const wantCops = wanted >= 2 ? Math.min(wanted, 4) : 0;
       while (cops.length < wantCops) spawnCop(player.pos);
       while (cops.length > wantCops) removeCop(cops.length - 1);
 
       // Cruiser chase: aim ahead of the player's motion, ram to stop him.
       for (const { car } of cruisers) {
+        // The player stole this cruiser: it is theirs now, not a chaser.
+        if (car.driver === 'player') continue;
         const target = G.driving ? G.driving : player;
         const ahead = G.driving ? 1.1 : 0;
         const tx = target.pos.x + Math.sin(target.heading || 0) * (target.speed || 0) * ahead;
         const tz = target.pos.z + Math.cos(target.heading || 0) * (target.speed || 0) * ahead;
         const dx = tx - car.pos.x, dz = tz - car.pos.z;
         const wantHeading = Math.atan2(dx, dz);
-        let dh = wantHeading - car.heading;
-        while (dh > Math.PI) dh -= Math.PI * 2;
-        while (dh < -Math.PI) dh += Math.PI * 2;
+        const dh = angleDiff(car.heading, wantHeading);
         const dist = Math.hypot(dx, dz);
         const throttle = dist < 6 ? 0.4 : 1;
         stepCar(car, dt, { throttle, steer: clamp(dh * 1.8, -1, 1), handbrake: false });

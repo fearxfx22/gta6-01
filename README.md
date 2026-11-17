@@ -30,22 +30,26 @@ live with WebAudio.
 
 ## What's in the city
 
-- **Drive and walk** — arcade car physics (drift, handbrake, sand slowdown) and
-  on-foot movement with a chase camera, across a 7×7-block grid with a beach and
-  ocean to the east, container docks to the north, and a marina and lighthouse
-  to the south.
+- **Drive and walk** — arcade car physics (drift, handbrake, sand slowdown,
+  brake lights, dust on the beach, tyre squeal on a hard slide) and on-foot
+  movement with a chase camera that widens its field of view as you go faster,
+  across a 7×7-block grid with a beach and ocean to the east, container docks
+  to the north, and a marina and lighthouse to the south.
 - **Traffic and pedestrians** — 14 cars driving the road graph with lane
   discipline and braking, 24 locals strolling the sidewalks who flee gunshots
-  and fast cars.
-- **Wanted level** — 0 to 5 stars. Stealing cars, hitting pedestrians and
-  shooting raise it; police cruisers chase and ram, foot cops close in to
-  arrest you. Lose them to cool down. Getting busted or wasted costs 20% of
-  your cash.
+  and fast cars (and get back up after being clipped). Jack a moving car and
+  the AI lets go of the wheel — it's yours now.
+- **Wanted level** — 0 to 5 stars (five stars pulse red). Stealing cars,
+  carjacking, hitting pedestrians and shooting raise it; police cruisers chase
+  and ram — two per star, up to ten — foot cops close in to arrest you. Lose
+  them to cool down. Getting busted or wasted costs 20% of your cash.
+  Crashes at speed throw sparks, a bang and a camera shake.
 - **Combat** — hitscan pistol with tracers, muzzle flash, hitmarkers and
-  headshots; rival gunmen shoot back.
+  headshots; rival gunmen shoot back. Every car is a target, parked or not.
 - **Five missions, one story** — First Gear, The Pickup, Hot Pursuit,
-  The Exchange and Sunset Run, with Vera's dialogue, gold beacons, and cash
-  rewards up to $2,000.
+  The Exchange and Sunset Run, with Vera's dialogue, gold beacons, cash
+  rewards up to $2,000 (shown in the HUD next to the mission name), and a
+  timer on the timed runs.
 - **HUD and save** — health, cash, wanted stars, objective with distance,
   speedometer, live minimap, and progress saved in the browser
   (localStorage) with a Continue button on the title screen.

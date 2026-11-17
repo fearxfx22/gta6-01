@@ -32,3 +32,11 @@ export const angleLerp = (a, b, t) => {
   return a + d * t;
 };
 export const dist2d = (ax, az, bx, bz) => Math.hypot(ax - bx, az - bz);
+// Smallest signed angle from a to b, wrapped to [-PI, PI]. The traffic,
+// police and pedestrian steering all used to inline this loop.
+export const angleDiff = (a, b) => {
+  let d = (b - a) % (Math.PI * 2);
+  if (d > Math.PI) d -= Math.PI * 2;
+  if (d < -Math.PI) d += Math.PI * 2;
+  return d;
+};

@@ -94,6 +94,19 @@ export function createAudio() {
     kill() { blip(660, 0.09, 'square', 0.16); setTimeout(() => blip(990, 0.12, 'square', 0.16), 90); },
     pickup() { blip(660, 0.1, 'sine', 0.2); setTimeout(() => blip(990, 0.16, 'sine', 0.2), 100); },
     crash() { noise(0.3, 900, 0.4); },
+    // Tyre squeal for a handbrake slide: short band-passed noise.
+    skid() {
+      if (!ensure()) return;
+      try {
+        const src = ctx.createBufferSource(); src.buffer = noiseBuf;
+        const f = ctx.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = 1100; f.Q.value = 1.4;
+        const g = ctx.createGain();
+        g.gain.setValueAtTime(0.16, ctx.currentTime);
+        g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.35);
+        src.connect(f); f.connect(g); g.connect(master);
+        src.start(); src.stop(ctx.currentTime + 0.37);
+      } catch { /* quiet */ }
+    },
     mission() { [523, 659, 784, 1046].forEach((f, i) => setTimeout(() => blip(f, 0.16, 'triangle', 0.2), i * 110)); },
     busted() { [392, 330, 262].forEach((f, i) => setTimeout(() => blip(f, 0.3, 'sawtooth', 0.14), i * 200)); },
     setEngine(speed01, driving) {

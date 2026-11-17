@@ -48,6 +48,17 @@ export const WANTED = {
   shootCop: 1,
 };
 
+export const TRAFFIC_COUNT = 14; // cars driving the road graph
+export const PED_COUNT = 24;     // locals on the sidewalks
+
+export const CRASH = {
+  cooldown: 0.5,   // s between crash feedback bursts
+  minRelSpeed: 4,  // relative speed (m/s) that counts as a crash
+  shake: 0.35,     // camera trauma added per crash
+};
+
+export const FOV_KICK = 10; // extra degrees of camera FOV at top speed
+
 export const POLICE = {
   maxCars: 10,
   spawnDist: 70,

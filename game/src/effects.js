@@ -51,6 +51,8 @@ export function createEffects(scene) {
     sparks(x, y, z) { burst(x, y, z, 0xffc24b, 14, 7, 3, 0.5); },
     smoke(x, y, z) { burst(x, y, z, 0x555555, 10, 2, 2, 1.1); },
     blood(x, y, z) { burst(x, y, z, 0xaa2211, 10, 4, 2, 0.6); },
+    // Dust kicked up by tyres on sand or a handbrake slide: pale, slow, long.
+    dust(x, y, z) { burst(x, y, z, 0xc9b18a, 6, 1.6, 1.2, 1.2); },
     muzzle(x, y, z) {
       flash.position.set(x, y, z);
       flashMat.opacity = 0.95;

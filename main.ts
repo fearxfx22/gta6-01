@@ -8,7 +8,7 @@
 //   mkdir -p out && MAKEFUN_OUTPUT_DIR=out node main.ts
 // Outside the grader's container, MAKEFUN_OUTPUT_DIR stands in for /output.
 
-import { cpSync, existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { buildDossier } from './vendor/makefun-game.ts';
@@ -29,6 +29,17 @@ if (existsSync(shotsDir)) cpSync(shotsDir, join(outputDir, 'screenshots'), { rec
 // dossier text is capped, and an entry is refused outright for more than four
 // screenshots, a screenshot over 256 KiB, more than 993 game files, game files
 // over 48 MiB in total, or a game path over 1000 bytes.
+const gameFiles = [];
+(function countFiles(dir) {
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const p = join(dir, entry.name);
+    if (entry.isDirectory()) countFiles(p);
+    else gameFiles.push(p);
+  }
+})(gameDir);
+if (gameFiles.length > 993) {
+  throw new Error(`game/ has ${gameFiles.length} files, over the 993-file gate cap`);
+}
 writeFileSync(
   join(outputDir, 'dossier.json'),
   buildDossier(outputDir, {

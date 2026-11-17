@@ -1,9 +1,9 @@
 // Pedestrians: locals strolling the sidewalks, who run when they hear a shot
 // or see a car coming at them, and go down when a car clips them.
+import { PED_COUNT } from './config.js';
 import { makePersonMesh } from './player.js';
-import { clamp } from './random.js';
+import { angleDiff, clamp } from './random.js';
 
-const PED_COUNT = 24;
 const JACKETS = [0x3a6a9a, 0x9a3a5a, 0x4a8a5a, 0xc2a23a, 0x6a4a9a, 0xdad8d2, 0x2a2d33, 0x8a6a3a];
 const PANTS = [0x2a3242, 0x3a2a22, 0x4a4a4a, 0x22303a];
 const SKINS = [0xc98a5a, 0x8a5a3a, 0xe8b88a, 0x6a4530];
@@ -47,6 +47,10 @@ export function createPedestrians(scene, world, rng) {
         if (ped.state === 'down') {
           ped.timer -= dt;
           if (ped.timer <= 0 && !ped.dead) {
+            // Back on their feet before they run: a knocked-down local who
+            // recovers was left lying flat (rotation never reset).
+            ped.mesh.rotation.x = 0;
+            ped.mesh.position.y = 0;
             ped.state = 'flee';
             ped.timer = 2.5;
           } else if (ped.timer <= 0 && ped.dead) {
@@ -86,9 +90,7 @@ export function createPedestrians(scene, world, rng) {
           else { ped.state = 'walk'; retarget(ped); }
         } else {
           const want = Math.atan2(dx, dz);
-          let dh = want - ped.heading;
-          while (dh > Math.PI) dh -= Math.PI * 2;
-          while (dh < -Math.PI) dh += Math.PI * 2;
+          const dh = angleDiff(ped.heading, want);
           ped.heading += clamp(dh, -5 * dt, 5 * dt);
           ped.x += Math.sin(ped.heading) * speed * dt;
           ped.z += Math.cos(ped.heading) * speed * dt;

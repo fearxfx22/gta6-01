@@ -8,7 +8,12 @@ export function readSave() {
     if (!raw) return null;
     const data = JSON.parse(raw);
     if (!data || !Array.isArray(data.missionsDone)) return null;
-    return { missionsDone: data.missionsDone.slice(0, 5), cash: data.cash | 0 };
+    // A short array (older or damaged save) must not read as "all done":
+    // pad missing jobs with false.
+    const missionsDone = data.missionsDone.slice(0, 5);
+    while (missionsDone.length < 5) missionsDone.push(false);
+    const cash = Number.isFinite(data.cash) ? data.cash | 0 : 0;
+    return { missionsDone, cash };
   } catch {
     return null;
   }

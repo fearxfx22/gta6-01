@@ -28,7 +28,8 @@ export function makeCarMesh(type, color) {
   } else {
     g.add(box(L * 0.52, 0.55, W * 0.86, 0x1a222e, -L * 0.05, 1.18, 0, 0.15, 0.7));
   }
-  // headlights + taillights (front is +x)
+  // headlights + taillights (front is +x). The taillight material is kept so
+  // syncMesh can flare the brake lights while the car is braking.
   const hl = new THREE.MeshStandardMaterial({ color: 0xfff2b0, emissive: 0xffe27a, emissiveIntensity: 1.4 });
   const tl = new THREE.MeshStandardMaterial({ color: 0x881111, emissive: 0xff2a1a, emissiveIntensity: 1.1 });
   for (const s of [-1, 1]) {
@@ -69,7 +70,7 @@ export function makeCarMesh(type, color) {
     g.add(pivot);
     wheels.push({ pivot, front });
   }
-  g.userData = { wheels, lightBar, length: L, width: W };
+  g.userData = { wheels, lightBar, length: L, width: W, tailMat: tl };
   return g;
 }
 
@@ -91,6 +92,8 @@ export function stepCar(car, dt, control) {
   }
   if (control.handbrake) car.speed -= Math.sign(car.speed) * Math.min(Math.abs(car.speed), 16 * dt);
   car.speed = clamp(car.speed, -CAR.maxReverse, cap);
+  // Braking (foot brake while moving forward, or handbrake) flares the tail lights.
+  car.braking = (control.throttle < 0 && car.speed > 0.5) || !!control.handbrake;
   const steerTarget = control.steer * CAR.steerMax * (car.speed >= 0 ? 1 : -1);
   car.steer = lerp(car.steer, steerTarget, Math.min(1, CAR.steerSpeed * dt * 2));
   const grip = control.handbrake ? CAR.driftGrip : CAR.grip;
@@ -150,6 +153,9 @@ export function createVehicles(scene, world, rng) {
   function syncMesh(car, dt) {
     car.mesh.position.set(car.pos.x, 0, car.pos.z);
     car.mesh.rotation.y = car.heading - Math.PI / 2;
+    if (car.mesh.userData.tailMat) {
+      car.mesh.userData.tailMat.emissiveIntensity = car.braking ? 3.4 : 1.1;
+    }
     for (const w of car.mesh.userData.wheels) {
       w.pivot.rotation.z -= (car.speed / 0.36) * dt;
       w.pivot.rotation.y = w.front ? car.steer * 0.4 : 0;

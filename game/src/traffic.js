@@ -1,10 +1,10 @@
 // Traffic: cars that drive the road graph like locals — pick a neighbouring
 // intersection, follow the lane (right-hand side), brake for the car ahead,
 // respawn near the player when they drift too far away.
+import { TRAFFIC_COUNT } from './config.js';
 import { stepCar } from './vehicles.js';
-import { clamp } from './random.js';
+import { angleDiff, clamp } from './random.js';
 
-const TRAFFIC_COUNT = 14;
 const LANE = 3.2; // right-hand offset from the road centre line
 
 export function createTraffic(scene, world, vehicles, rng) {
@@ -53,6 +53,8 @@ export function createTraffic(scene, world, vehicles, rng) {
     cars,
     update(dt, playerPos) {
       for (const car of cars) {
+        // The player is driving this one: the AI must not fight their input.
+        if (car.driver === 'player') continue;
         const target = world.nodes[car.ai.target];
         // Lane offset: right-hand side of the direction of travel.
         const dx = target.x - car.pos.x, dz = target.z - car.pos.z;
@@ -62,9 +64,7 @@ export function createTraffic(scene, world, vehicles, rng) {
         const tx = target.x + rx * LANE, tz = target.z + rz * LANE;
         const tdx = tx - car.pos.x, tdz = tz - car.pos.z;
         const wantHeading = Math.atan2(tdx, tdz);
-        let dh = wantHeading - car.heading;
-        while (dh > Math.PI) dh -= Math.PI * 2;
-        while (dh < -Math.PI) dh += Math.PI * 2;
+        const dh = angleDiff(car.heading, wantHeading);
         const ahead = carAhead(car);
         let throttle = 0.85;
         if (ahead < 9) throttle = 0;

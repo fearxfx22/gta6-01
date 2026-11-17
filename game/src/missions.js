@@ -141,7 +141,9 @@ export function createMissions(scene, G) {
     G.combat.clearEnemies();
     if (currentIndex + 1 < MISSIONS.length) {
       const next = currentIndex + 1;
-      setTimeout(() => { if (!active) startMission(next); }, 4500);
+      // Only chain into the next job if the run is still going: the player
+      // may have been busted, wasted, or quit to the title in the meantime.
+      setTimeout(() => { if (!active && G.screen === 'play') startMission(next); }, 4500);
     } else {
       setTimeout(() => {
         if (G.screen === 'play') G.hud.banner('Solmar Bay is yours', 'Every job done. The city is your playground now.');

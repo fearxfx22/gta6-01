@@ -3,7 +3,6 @@
 import * as THREE from 'three';
 import { COMBAT } from './config.js';
 import { makePersonMesh } from './player.js';
-import { clamp } from './random.js';
 
 export function createCombat(scene, world, rng) {
   const raycaster = new THREE.Raycaster();
@@ -67,7 +66,9 @@ export function createCombat(scene, world, rng) {
     for (const e of enemies) if (!e.dead) list.push(e.mesh);
     for (const c of G.police.cops) list.push(c.mesh);
     for (const p of G.pedestrians.peds) if (p.state !== 'down') list.push(p.mesh);
-    for (const car of G.vehicles.cars) if (!car.parked) list.push(car.mesh);
+    // Every car is a target, parked or not — a parked car takes sparks, not
+    // a pass-through.
+    for (const car of G.vehicles.cars) list.push(car.mesh);
     return list;
   }
 

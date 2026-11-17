@@ -53,6 +53,9 @@ export function createInput(canvas) {
       return { x, z };
     },
     takePressed() { const out = new Set(pressed); pressed.clear(); return out; },
+    // Drop stale edge-triggered presses (e.g. keys hit on the title screen
+    // before a run starts, so they can't fire an action on the first frame).
+    clearPressed() { pressed.clear(); },
     takeDrag() { const d = { dx: dragDX, dy: dragDY }; dragDX = 0; dragDY = 0; return d; },
     takeWheel() { const w = wheel; wheel = 0; return w; },
     get mouseDown() { return mouseDown; },

@@ -55,6 +55,7 @@ export function createPlayer(scene, world) {
     reset(x, z) {
       pos.set(x, 0, z);
       mesh.position.copy(pos);
+      mesh.rotation.x = 0; // stand back up after being wasted
       vel.set(0, 0, 0);
       vy = 0; health = PLAYER.health; dead = false; lastHurt = -99;
     },
@@ -101,16 +102,17 @@ export function createPlayer(scene, world) {
       if (time - lastHurt > PLAYER.regenDelay && health < PLAYER.health) {
         health = Math.min(PLAYER.health, health + PLAYER.regenRate * dt);
       }
-      // Walk cycle.
+      // Walk cycle + a small vertical bob while moving.
       const moving = Math.hypot(vel.x, vel.z);
       walkPhase += moving * dt * 1.9;
       const swing = Math.min(1, moving / 4) * Math.sin(walkPhase) * 0.55;
+      const bob = Math.min(1, moving / 4) * Math.abs(Math.sin(walkPhase)) * 0.07;
       const u = mesh.userData;
       u.legL.rotation.x = swing;
       u.legR.rotation.x = -swing;
       u.armL.rotation.x = -swing * 0.8;
       u.armR.rotation.x = swing * 0.8;
-      mesh.position.copy(pos);
+      mesh.position.set(pos.x, pos.y + bob, pos.z);
       mesh.rotation.y = heading;
       mesh.rotation.x = 0;
     },

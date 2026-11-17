@@ -94,6 +94,16 @@ export function stageShot(name, G) {
       else { pc.pos.set(car.pos.x + 14, 0, car.pos.z + 7.5); pc.speed = 18; }
       pc.heading = car.heading;
     }
+    // Two locals ahead on the avenue, so the chase has traffic to thread through.
+    const aheadSpots = [[car.pos.x + 42, 117], [car.pos.x + 66, 123]];
+    for (let i = 0; i < 2; i += 1) {
+      const tc = traffic.cars[3 + i];
+      tc.pos.set(aheadSpots[i][0], 0, aheadSpots[i][1]);
+      tc.heading = Math.PI / 2;
+      tc.speed = 9;
+      tc.ai.node = nodeAt(120, 120);
+      tc.ai.target = nodeAt(180, 120);
+    }
     sim(0.5, (dt) => {
       stepCar(car, dt, { throttle: 0.5, steer: 0, handbrake: false });
       player.pos.set(car.pos.x, 0, car.pos.z);

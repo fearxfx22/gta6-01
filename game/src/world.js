@@ -87,21 +87,21 @@ export function buildWorld(scene, rng) {
         const walk = new THREE.Mesh(new THREE.PlaneGeometry(3, 420), walkMat);
         walk.rotation.x = -Math.PI / 2;
         if (horiz) walk.rotation.z = Math.PI / 2;
-        walk.position.set(horiz ? c + off : c, 0.05, horiz ? 0 : c + off);
-        walk.position.x = horiz ? 0 : c + off;
-        walk.position.z = horiz ? c + off : 0;
+        // Horizontal strip runs along x at z = c + off; vertical runs along z at x = c + off.
+        walk.position.set(horiz ? 0 : c + off, 0.05, horiz ? c + off : 0);
         walk.receiveShadow = true;
         group.add(walk);
       }
     }
   }
   // Block slabs: light concrete under the buildings so the city reads bright.
+  // Block centres step by 60 m, so the colour index mixes both axes.
   const slabCols = [0x8a8578, 0x7e7a6e, 0x93897a, 0x857d70];
   const slabGeo = new THREE.PlaneGeometry(WORLD.block, WORLD.block);
   for (const bx of BLOCK_CENTERS) {
     for (const bz of BLOCK_CENTERS) {
       if (bx === 0 && bz === 0) continue;
-      const slab = new THREE.Mesh(slabGeo, new THREE.MeshStandardMaterial({ color: slabCols[(bx + bz + 300) % 4], roughness: 1 }));
+      const slab = new THREE.Mesh(slabGeo, new THREE.MeshStandardMaterial({ color: slabCols[(((bx + 150) / 60) + ((bz + 150) / 60) * 2) % 4], roughness: 1 }));
       slab.rotation.x = -Math.PI / 2;
       slab.position.set(bx, 0.03, bz);
       slab.receiveShadow = true;
