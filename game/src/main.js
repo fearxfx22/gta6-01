@@ -18,6 +18,9 @@ import { createPolice } from './police.js';
 import { createCombat } from './combat.js';
 import { createEffects } from './effects.js';
 import { createAudio } from './audio.js';
+import { createHud } from './hud.js';
+import { createMissions } from './missions.js';
+import { readSave, writeSave } from './save.js';
 import { stageShot } from './shots.js';
 
 const STEP = 1 / 60;
@@ -38,6 +41,7 @@ const G = {
   cash: 0,
   wanted: 0,
   driving: null,      // car the player drives, or null
+  missionsDone: [false, false, false, false, false],
   seed,
   rng,
 };
@@ -64,6 +68,10 @@ const police = createPolice(rig.scene, world, vehicles, rng);
 G.police = police;
 const combat = createCombat(rig.scene, world, rng);
 G.combat = combat;
+const hud = createHud(G);
+G.hud = hud;
+const missions = createMissions(rig.scene, G);
+G.missions = missions;
 const input = createInput(canvas);
 G.input = input;
 
@@ -87,6 +95,10 @@ function showScreen(name) {
   pauseEl.classList.toggle('hidden', name !== 'paused');
   endEl.classList.toggle('hidden', name !== 'end');
   hudEl.classList.toggle('hidden', name !== 'play');
+  if (name === 'paused') {
+    const done = G.missionsDone.filter(Boolean).length;
+    document.getElementById('pausestats').textContent = `Jobs done: ${done}/5 — Cash: $${G.cash.toLocaleString('en-US')} — Wanted: ${'★'.repeat(G.wanted)}${'☆'.repeat(5 - G.wanted)}`;
+  }
   if (name === 'play') announce('Playing. WASD to move, E to enter a car.');
 }
 
@@ -94,6 +106,7 @@ function endRun(kind) {
   // Busted or wasted: the run pauses here, the player keeps most of his cash.
   G.wanted = 0;
   G.cash = Math.floor(G.cash * 0.8);
+  writeSave(G.missionsDone, G.cash);
   police.clear();
   combat.clearEnemies();
   if (G.driving) { G.driving.driver = null; G.driving = null; }
@@ -122,13 +135,25 @@ function startGame(fresh) {
   if (fresh) {
     G.cash = 0;
     G.wanted = 0;
+    G.missionsDone = [false, false, false, false, false];
+    writeSave(G.missionsDone, 0);
     police.clear();
     combat.clearEnemies();
     player.reset(-150, 132);
     if (G.driving) { G.driving.driver = null; G.driving = null; }
+  } else {
+    const save = readSave();
+    if (save) {
+      G.cash = save.cash;
+      G.missionsDone = save.missionsDone;
+    }
+    police.clear();
+    combat.clearEnemies();
+    if (G.driving) { G.driving.driver = null; G.driving = null; }
   }
   audio.start();
   showScreen('play');
+  missions.startFromSave(G.missionsDone);
 }
 
 function driveControl() {
@@ -171,6 +196,7 @@ function step(dt) {
   const pressed = input.takePressed();
   if (pressed.has('Escape') && G.screen === 'play') { showScreen('paused'); announce('Paused.'); return; }
   if (pressed.has('KeyE') && G.screen === 'play') tryEnterExitCar();
+  if (pressed.has('KeyR') && G.screen === 'play') missions.restart();
 
   if (G.driving) {
     const car = G.driving;
@@ -195,7 +221,9 @@ function step(dt) {
   });
   police.update(dt, G);
   combat.update(dt, G);
+  missions.update(dt);
   effects.update(dt);
+  hud.update(dt);
   audio.update(dt, G.wanted, police.nearestDist < 90);
   audio.setEngine(G.driving ? Math.abs(G.driving.speed) / 47 : 0, !!G.driving);
   if (player.dead) { G.onWasted(); return; }
@@ -210,15 +238,6 @@ function step(dt) {
         if (car.driver === 'player') G.addWanted(1);
       }
     }
-  }
-
-  // Minimal HUD (the full HUD lands with phase 4).
-  const speedEl = document.getElementById('speed');
-  if (G.driving) {
-    speedEl.classList.remove('hidden');
-    speedEl.innerHTML = `${Math.round(Math.abs(G.driving.speed) * 3.6)} <small>km/h</small>`;
-  } else {
-    speedEl.classList.add('hidden');
   }
 }
 
@@ -246,9 +265,19 @@ function frame(now) {
 
 function wireButtons() {
   document.getElementById('btnstart').addEventListener('click', () => startGame(true));
+  const btnContinue = document.getElementById('btncontinue');
+  const save = readSave();
+  if (save && save.missionsDone.some(Boolean)) {
+    btnContinue.classList.remove('hidden');
+    const done = save.missionsDone.filter(Boolean).length;
+    document.querySelector('#titlescreen .stats').textContent =
+      `Welcome back, Rex — ${done} of 5 jobs done, $${save.cash.toLocaleString('en-US')} in your pocket.`;
+  }
+  btnContinue.addEventListener('click', () => startGame(false));
   document.getElementById('btnresume').addEventListener('click', () => showScreen('play'));
+  document.getElementById('btnrestartmission').addEventListener('click', () => { missions.restart(); showScreen('play'); });
   document.getElementById('btnquit').addEventListener('click', () => showScreen('title'));
-  document.getElementById('btnretry').addEventListener('click', () => startGame(true));
+  document.getElementById('btnretry').addEventListener('click', () => startGame(false));
   document.getElementById('btntitle2').addEventListener('click', () => showScreen('title'));
   window.addEventListener('keydown', (e) => {
     if (e.code === 'Enter' && G.screen === 'title') startGame(true);

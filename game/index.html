@@ -51,8 +51,8 @@
   #hitmarker::before, #hitmarker::after { content: ""; position: absolute; inset: 0; }
   #hitmarker::before { background: linear-gradient(45deg, transparent 46%, #fff 46% 54%, transparent 54%), linear-gradient(-45deg, transparent 46%, #fff 46% 54%, transparent 54%); }
   #hitmarker.show { opacity: 1; }
-  #toast { position: absolute; left: 50%; top: 84px; transform: translateX(-50%); padding: 9px 18px; font-size: 15px; font-weight: 700; text-align: center; max-width: 640px; }
-  #banner { position: absolute; left: 50%; top: 34%; transform: translate(-50%, -50%); text-align: center; }
+  #toast { position: absolute; left: 50%; top: 58px; transform: translateX(-50%); padding: 9px 18px; font-size: 15px; font-weight: 700; text-align: center; max-width: 640px; }
+  #banner { position: absolute; left: 50%; top: 38%; transform: translate(-50%, -50%); text-align: center; }
   #banner .big { font-size: 44px; font-weight: 800; letter-spacing: 2px; color: var(--gold); text-shadow: 0 3px 0 rgba(0,0,0,.45), 0 0 26px rgba(255,194,75,.5); }
   #banner .sub { font-size: 17px; margin-top: 6px; color: var(--ink); text-shadow: 0 2px 6px #000; }
   #dialogue { position: absolute; left: 50%; bottom: 108px; transform: translateX(-50%); max-width: 620px; padding: 10px 16px; font-size: 14.5px; line-height: 1.5; }
@@ -99,7 +99,7 @@
   </div>
   <div id="bottomleft" class="panel">
     <b>W A S D</b> move / drive &nbsp; <b>Shift</b> sprint &nbsp; <b>E</b> enter / steal car<br>
-    <b>Mouse</b> drag to look &nbsp; <b>Click</b> shoot &nbsp; <b>Space</b> handbrake / jump &nbsp; <b>Esc</b> pause
+    <b>Mouse</b> drag to look &nbsp; <b>Click</b> shoot &nbsp; <b>Space</b> handbrake / jump &nbsp; <b>Esc</b> pause &nbsp; <b>R</b> restart mission
   </div>
   <div id="bottomright">
     <canvas id="minimap" width="190" height="190"></canvas>
@@ -126,6 +126,7 @@
       <div><b>Click</b> shoot pistol</div><div><b>Space</b> handbrake / jump</div>
       <div><b>R</b> restart mission</div><div><b>Esc</b> pause</div>
     </div>
+    <div class="stats"></div>
     <button class="btn" id="btnstart">Start engine</button>
     <button class="btn ghost hidden" id="btncontinue">Continue</button>
     <div class="fine">Progress saves in this browser. Stealing cars and shooting raise your wanted level —
