@@ -12,6 +12,8 @@ import { buildWorld } from './world.js';
 import { createRenderer } from './render.js';
 import { createPlayer } from './player.js';
 import { createVehicles, stepCar } from './vehicles.js';
+import { createTraffic } from './traffic.js';
+import { createPedestrians } from './pedestrians.js';
 import { stageShot } from './shots.js';
 
 const STEP = 1 / 60;
@@ -46,8 +48,18 @@ const player = createPlayer(rig.scene, world);
 G.player = player;
 const vehicles = createVehicles(rig.scene, world, rng);
 G.vehicles = vehicles;
+const traffic = createTraffic(rig.scene, world, vehicles, rng);
+G.traffic = traffic;
+const pedestrians = createPedestrians(rig.scene, world, rng);
+G.pedestrians = pedestrians;
 const input = createInput(canvas);
 G.input = input;
+
+// Wanted level (0-5). Crimes raise it; the police system (phase 3) decays it
+// and sends the cars. Missions can set it directly.
+G.addWanted = (n) => { G.wanted = Math.min(5, Math.max(0, G.wanted + n)); };
+G.setWanted = (n) => { G.wanted = Math.min(5, Math.max(0, n)); };
+G.lastGunshot = null;
 
 function announce(message) { status.textContent = message; }
 G.announce = announce;
@@ -127,6 +139,25 @@ function step(dt) {
   const wheel = input.takeWheel();
   if (wheel) rig.zoom(wheel);
   vehicles.update(dt, world, null);
+  traffic.update(dt, player.pos);
+  pedestrians.update(dt, {
+    playerX: player.pos.x,
+    playerZ: player.pos.z,
+    carSpeed: G.driving ? Math.abs(G.driving.speed) : 0,
+    gunshot: G.lastGunshot,
+  });
+  // Cars clip pedestrians: they go down, and the driver takes the heat.
+  for (const car of vehicles.cars) {
+    if (car.parked || Math.abs(car.speed) < 3) continue;
+    for (const ped of pedestrians.peds) {
+      if (ped.state === 'down') continue;
+      const d = Math.hypot(ped.x - car.pos.x, ped.z - car.pos.z);
+      if (d < 2.4) {
+        pedestrians.knockDown(ped, false);
+        if (car.driver === 'player') G.addWanted(1);
+      }
+    }
+  }
 
   // Minimal HUD (the full HUD lands with phase 4).
   const speedEl = document.getElementById('speed');
