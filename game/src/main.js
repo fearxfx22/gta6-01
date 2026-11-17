@@ -14,6 +14,10 @@ import { createPlayer } from './player.js';
 import { createVehicles, stepCar } from './vehicles.js';
 import { createTraffic } from './traffic.js';
 import { createPedestrians } from './pedestrians.js';
+import { createPolice } from './police.js';
+import { createCombat } from './combat.js';
+import { createEffects } from './effects.js';
+import { createAudio } from './audio.js';
 import { stageShot } from './shots.js';
 
 const STEP = 1 / 60;
@@ -52,6 +56,14 @@ const traffic = createTraffic(rig.scene, world, vehicles, rng);
 G.traffic = traffic;
 const pedestrians = createPedestrians(rig.scene, world, rng);
 G.pedestrians = pedestrians;
+const effects = createEffects(rig.scene);
+G.effects = effects;
+const audio = createAudio();
+G.audio = audio;
+const police = createPolice(rig.scene, world, vehicles, rng);
+G.police = police;
+const combat = createCombat(rig.scene, world, rng);
+G.combat = combat;
 const input = createInput(canvas);
 G.input = input;
 
@@ -78,13 +90,44 @@ function showScreen(name) {
   if (name === 'play') announce('Playing. WASD to move, E to enter a car.');
 }
 
+function endRun(kind) {
+  // Busted or wasted: the run pauses here, the player keeps most of his cash.
+  G.wanted = 0;
+  G.cash = Math.floor(G.cash * 0.8);
+  police.clear();
+  combat.clearEnemies();
+  if (G.driving) { G.driving.driver = null; G.driving = null; }
+  player.mesh.visible = true;
+  const title = document.getElementById('endtitle');
+  const text = document.getElementById('endtext');
+  if (kind === 'busted') {
+    title.textContent = 'BUSTED';
+    title.classList.remove('win');
+    text.textContent = 'The Solmar Bay police hauled you in. They kept 20% of your cash as a "processing fee". Vera is not impressed.';
+    audio.busted();
+  } else {
+    title.textContent = 'WASTED';
+    title.classList.remove('win');
+    text.textContent = 'You woke up at Solmar General, 20% lighter. The city is still out there, Rex.';
+    audio.busted();
+  }
+  player.reset(150, -132);
+  showScreen('end');
+  announce(kind === 'busted' ? 'Busted.' : 'Wasted.');
+}
+G.onBusted = () => { if (G.screen === 'play') endRun('busted'); };
+G.onWasted = () => { if (G.screen === 'play') endRun('wasted'); };
+
 function startGame(fresh) {
   if (fresh) {
     G.cash = 0;
     G.wanted = 0;
+    police.clear();
+    combat.clearEnemies();
     player.reset(-150, 132);
     if (G.driving) { G.driving.driver = null; G.driving = null; }
   }
+  audio.start();
   showScreen('play');
 }
 
@@ -110,6 +153,10 @@ function tryEnterExitCar() {
   }
   const car = vehicles.nearestCar(player.pos.x, player.pos.z, 3.6);
   if (car) {
+    if (car.parked) {
+      G.addWanted(1);
+      announce('Car stolen. The police have been called.');
+    }
     G.driving = car;
     car.driver = 'player';
     car.parked = false;
@@ -146,6 +193,12 @@ function step(dt) {
     carSpeed: G.driving ? Math.abs(G.driving.speed) : 0,
     gunshot: G.lastGunshot,
   });
+  police.update(dt, G);
+  combat.update(dt, G);
+  effects.update(dt);
+  audio.update(dt, G.wanted, police.nearestDist < 90);
+  audio.setEngine(G.driving ? Math.abs(G.driving.speed) / 47 : 0, !!G.driving);
+  if (player.dead) { G.onWasted(); return; }
   // Cars clip pedestrians: they go down, and the driver takes the heat.
   for (const car of vehicles.cars) {
     if (car.parked || Math.abs(car.speed) < 3) continue;
@@ -178,7 +231,11 @@ function frame(now) {
     rig.render();
     return;
   }
-  if (G.screen !== 'play') { rig.render(); return; }
+  if (G.screen !== 'play') {
+    audio.setEngine(0, false);
+    rig.render();
+    return;
+  }
   const dt = Math.min((now - (frame.last || now)) / 1000, MAX_FRAME);
   frame.last = now;
   let acc = (frame.acc || 0) + dt;
@@ -225,4 +282,10 @@ window.__probe = () => JSON.stringify({
   wanted: G.wanted,
   cash: G.cash,
   health: Math.round(player.health),
+  policeCars: G.police ? G.police.cruisers.length : 0,
+  cops: G.police ? G.police.cops.length : 0,
+  enemies: G.combat ? G.combat.enemies.length : 0,
+  mission: G.missions ? G.missions.currentIndex : -1,
 });
+// QA handle for scripted play-tests (spawn enemies, read state).
+window.__solmar = G;

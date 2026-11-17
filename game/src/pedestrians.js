@@ -30,6 +30,7 @@ export function createPedestrians(scene, world, rng) {
       phase: rng.range(0, Math.PI * 2),
       dead: false,
     });
+    mesh.traverse((o) => { o.userData.shootable = peds[peds.length - 1]; });
   }
 
   function retarget(ped) {

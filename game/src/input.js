@@ -7,7 +7,7 @@ export function createInput(canvas) {
   const pressed = new Set(); // edge-triggered, consumed by takePressed()
   let dragDX = 0, dragDY = 0, wheel = 0;
   let dragging = false, lastX = 0, lastY = 0;
-  let mouseDown = false;
+  let mouseDown = false, dragMoved = 0;
 
   const onKeyDown = (e) => {
     if (e.repeat) return;
@@ -18,13 +18,16 @@ export function createInput(canvas) {
   const onKeyUp = (e) => keys.delete(e.code);
   const onMouseDown = (e) => {
     mouseDown = true;
+    dragMoved = 0;
     if (e.button === 0) pressed.add('Mouse0');
     dragging = true; lastX = e.clientX; lastY = e.clientY;
   };
   const onMouseMove = (e) => {
     if (!dragging) return;
-    dragDX += e.clientX - lastX;
-    dragDY += e.clientY - lastY;
+    const dx = e.clientX - lastX, dy = e.clientY - lastY;
+    dragDX += dx;
+    dragDY += dy;
+    dragMoved += Math.abs(dx) + Math.abs(dy);
     lastX = e.clientX; lastY = e.clientY;
   };
   const onMouseUp = () => { mouseDown = false; dragging = false; };
@@ -53,6 +56,9 @@ export function createInput(canvas) {
     takeDrag() { const d = { dx: dragDX, dy: dragDY }; dragDX = 0; dragDY = 0; return d; },
     takeWheel() { const w = wheel; wheel = 0; return w; },
     get mouseDown() { return mouseDown; },
+    // Pixels the pointer moved since mousedown: a real click barely moves,
+    // a camera drag moves a lot. Shooting only happens on a near-still hold.
+    dragDistance() { return dragMoved; },
     dispose() {
       window.removeEventListener('keydown', onKeyDown);
       window.removeEventListener('keyup', onKeyUp);
