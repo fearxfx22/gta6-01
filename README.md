@@ -4,11 +4,12 @@
 [![rank](https://make.fun/badge/gta6-01/fearxfx22/gta6-01/rank.svg)](https://make.fun/c/gta6-01)
 [![reward](https://make.fun/badge/gta6-01/fearxfx22/gta6-01/reward.svg)](https://make.fun/c/gta6-01)
 
-An original open-world crime game in the browser. You are **Rex Dalton**, a getaway
-driver with a debt and a fast car to win back. **Vera Solano** has five jobs for you
-across **Solmar Bay** — a sun-soaked coastal city of avenues, a beach, container
-docks, a marina and a lighthouse. Steal cars, lose the police, take out the
-Tide Kings, and make the sunset run before the clock runs out.
+An original open-world crime game that runs in the browser. You play
+**Rex Dalton**, a getaway driver with a debt and a fast car to win back.
+**Vera Solano** has five jobs for you across **Solmar Bay** — a sun-soaked
+coastal city of avenues, a beach, container docks, a marina and a lighthouse.
+Steal cars, lose the police, take out the Tide Kings, and make the sunset run
+before the clock runs out.
 
 ## Play
 

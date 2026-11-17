@@ -5,74 +5,183 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Solmar Bay — Sunset City Stories</title>
 <style>
+  /* ---- palette + type ---- */
   :root {
     --ink: #fff7e8;
     --ink-dim: #d8c9a8;
     --coral: #ff5a3c;
     --gold: #ffc24b;
     --teal: #19c2b8;
+    --danger: #ff3b30;
     --panel: rgba(10, 18, 30, 0.72);
     --panel-line: rgba(255, 194, 75, 0.35);
-    --danger: #ff3b30;
     --font: "Trebuchet MS", "Segoe UI", Verdana, sans-serif;
   }
-  html, body { margin: 0; height: 100%; overflow-x: clip; background: #0e1a2b; font-family: var(--font); }
-  #scene { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
-  #status { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+  /* ---- page ---- */
+  html, body {
+    margin: 0;
+    height: 100%;
+    overflow-x: clip;
+    background: #0e1a2b;
+    font-family: var(--font);
+  }
+  #scene {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+    touch-action: none;
+  }
+  /* Screen-reader status line: invisible, still announced. */
+  #status {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
   .hidden { display: none !important; }
 
-  /* ---------- HUD ---------- */
-  #hud { position: fixed; inset: 0; pointer-events: none; color: var(--ink); user-select: none; }
-  .panel { background: var(--panel); border: 1px solid var(--panel-line); border-radius: 10px; backdrop-filter: blur(3px); }
+  /* ---- HUD frame ---- */
+  #hud {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    color: var(--ink);
+    user-select: none;
+  }
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--panel-line);
+    border-radius: 10px;
+    backdrop-filter: blur(3px);
+  }
+
+  /* top-left: wanted stars, health, cash */
   #topleft { position: absolute; top: 14px; left: 14px; padding: 10px 14px; min-width: 210px; }
-  #stars { font-size: 22px; letter-spacing: 3px; color: var(--gold); text-shadow: 0 0 8px rgba(255,194,75,.6); line-height: 1; }
+  #stars {
+    font-size: 22px;
+    letter-spacing: 3px;
+    color: var(--gold);
+    text-shadow: 0 0 8px rgba(255,194,75,.6);
+    line-height: 1;
+  }
   #stars .off { color: rgba(255,255,255,.25); text-shadow: none; }
   #stars.max { animation: starpulse .6s infinite alternate; }
-  @keyframes starpulse { from { text-shadow: 0 0 8px rgba(255,194,75,.6); } to { text-shadow: 0 0 18px rgba(255,59,48,.95); color: #ff8a7a; } }
+  @keyframes starpulse {
+    from { text-shadow: 0 0 8px rgba(255,194,75,.6); }
+    to { text-shadow: 0 0 18px rgba(255,59,48,.95); color: #ff8a7a; }
+  }
   #healthrow { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
   #healthbar { flex: 1; height: 10px; background: rgba(255,255,255,.18); border-radius: 6px; overflow: hidden; }
   #healthfill { height: 100%; width: 100%; background: linear-gradient(90deg, #37d67a, #a8e063); border-radius: 6px; }
   #healthfill.low { background: linear-gradient(90deg, #ff3b30, #ff7a45); }
   #cash { margin-top: 7px; font-size: 19px; font-weight: 700; color: var(--gold); }
   #cash small { color: var(--ink-dim); font-weight: 400; font-size: 12px; }
+
+  /* top-right: current mission */
   #topright { position: absolute; top: 14px; right: 14px; padding: 10px 14px; max-width: 320px; text-align: right; }
   #missionname { font-size: 15px; font-weight: 700; color: var(--gold); letter-spacing: .4px; }
   #objective { font-size: 13.5px; line-height: 1.45; margin-top: 3px; color: var(--ink); }
   #objdist { font-size: 12px; color: var(--teal); margin-top: 2px; font-weight: 700; }
+
+  /* bottom-left: controls cheat sheet */
   #bottomleft { position: absolute; left: 14px; bottom: 14px; padding: 9px 12px; font-size: 12.5px; line-height: 1.7; color: var(--ink-dim); }
   #bottomleft b { color: var(--ink); }
+
+  /* bottom-right: minimap + speedometer */
   #bottomright { position: absolute; right: 14px; bottom: 14px; text-align: right; }
   #minimap { width: 190px; height: 190px; border-radius: 10px; border: 1px solid var(--panel-line); background: rgba(8, 14, 24, .8); }
   #speed { margin-top: 6px; font-size: 26px; font-weight: 700; color: var(--ink); text-shadow: 0 2px 6px rgba(0,0,0,.6); }
   #speed small { font-size: 12px; color: var(--ink-dim); font-weight: 400; }
+
+  /* centre: crosshair + hitmarker */
   #crosshair { position: absolute; left: 50%; top: 50%; width: 22px; height: 22px; margin: -11px 0 0 -11px; }
   #crosshair::before, #crosshair::after { content: ""; position: absolute; background: var(--ink); box-shadow: 0 0 4px #000; }
   #crosshair::before { left: 10px; top: 0; width: 2px; height: 22px; }
   #crosshair::after { left: 0; top: 10px; width: 22px; height: 2px; }
   #hitmarker { position: absolute; left: 50%; top: 50%; width: 26px; height: 26px; margin: -13px 0 0 -13px; opacity: 0; }
   #hitmarker::before, #hitmarker::after { content: ""; position: absolute; inset: 0; }
-  #hitmarker::before { background: linear-gradient(45deg, transparent 46%, #fff 46% 54%, transparent 54%), linear-gradient(-45deg, transparent 46%, #fff 46% 54%, transparent 54%); }
+  #hitmarker::before {
+    background:
+      linear-gradient(45deg, transparent 46%, #fff 46% 54%, transparent 54%),
+      linear-gradient(-45deg, transparent 46%, #fff 46% 54%, transparent 54%);
+  }
   #hitmarker.show { opacity: 1; }
-  #toast { position: absolute; left: 50%; top: 58px; transform: translateX(-50%); padding: 9px 18px; font-size: 15px; font-weight: 700; text-align: center; max-width: 640px; }
+
+  /* messages: toast, banner, Vera's dialogue */
+  #toast {
+    position: absolute;
+    left: 50%;
+    top: 58px;
+    transform: translateX(-50%);
+    padding: 9px 18px;
+    font-size: 15px;
+    font-weight: 700;
+    text-align: center;
+    max-width: 640px;
+  }
   #banner { position: absolute; left: 50%; top: 38%; transform: translate(-50%, -50%); text-align: center; }
-  #banner .big { font-size: 44px; font-weight: 800; letter-spacing: 2px; color: var(--gold); text-shadow: 0 3px 0 rgba(0,0,0,.45), 0 0 26px rgba(255,194,75,.5); }
+  #banner .big {
+    font-size: 44px;
+    font-weight: 800;
+    letter-spacing: 2px;
+    color: var(--gold);
+    text-shadow: 0 3px 0 rgba(0,0,0,.45), 0 0 26px rgba(255,194,75,.5);
+  }
   #banner .sub { font-size: 17px; margin-top: 6px; color: var(--ink); text-shadow: 0 2px 6px #000; }
-  #dialogue { position: absolute; left: 50%; bottom: 108px; transform: translateX(-50%); max-width: 620px; padding: 10px 16px; font-size: 14.5px; line-height: 1.5; }
+  #dialogue {
+    position: absolute;
+    left: 50%;
+    bottom: 108px;
+    transform: translateX(-50%);
+    max-width: 620px;
+    padding: 10px 16px;
+    font-size: 14.5px;
+    line-height: 1.5;
+  }
   #dialogue b { color: var(--gold); }
+
+  /* full-screen washes */
   #vignette { position: fixed; inset: 0; pointer-events: none; box-shadow: inset 0 0 120px 40px rgba(255, 30, 20, 0); transition: box-shadow .25s; }
   #vignette.hurt { box-shadow: inset 0 0 120px 40px rgba(255, 30, 20, .55); }
   #wantedflash { position: fixed; inset: 0; pointer-events: none; background: rgba(20, 60, 255, .07); opacity: 0; }
 
-  /* ---------- Screens ---------- */
+  /* ---- title / pause / end screens ---- */
   .screen { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; color: var(--ink); }
-  .screen .card { max-width: 620px; width: calc(100% - 40px); padding: 30px 34px 26px; background: rgba(8, 15, 26, .78); border: 1px solid var(--panel-line); border-radius: 16px; backdrop-filter: blur(5px); }
+  .screen .card {
+    max-width: 620px;
+    width: calc(100% - 40px);
+    padding: 30px 34px 26px;
+    background: rgba(8, 15, 26, .78);
+    border: 1px solid var(--panel-line);
+    border-radius: 16px;
+    backdrop-filter: blur(5px);
+  }
   .screen h1 { margin: 0; font-size: 52px; line-height: .95; letter-spacing: 1px; color: var(--gold); text-shadow: 0 3px 0 rgba(0,0,0,.4); }
   .screen h1 span { display: block; font-size: 20px; letter-spacing: 6px; color: var(--teal); margin-top: 6px; }
   .screen p { font-size: 15px; line-height: 1.6; color: var(--ink-dim); margin: 14px 0; }
   .screen p b { color: var(--ink); }
   .keys { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 18px; font-size: 13.5px; line-height: 1.9; color: var(--ink-dim); margin: 10px 0 18px; }
   .keys b { color: var(--ink); background: rgba(255,255,255,.12); border-radius: 5px; padding: 1px 7px; font-size: 12px; }
-  .btn { pointer-events: auto; cursor: pointer; display: inline-block; background: var(--coral); color: #fff; border: 0; border-radius: 9px; padding: 12px 26px; font-size: 16px; font-weight: 800; font-family: var(--font); letter-spacing: .5px; margin-right: 10px; }
+  .btn {
+    pointer-events: auto;
+    cursor: pointer;
+    display: inline-block;
+    background: var(--coral);
+    color: #fff;
+    border: 0;
+    border-radius: 9px;
+    padding: 12px 26px;
+    font-size: 16px;
+    font-weight: 800;
+    font-family: var(--font);
+    letter-spacing: .5px;
+    margin-right: 10px;
+  }
   .btn:hover { filter: brightness(1.12); }
   .btn:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
   .btn.ghost { background: rgba(255,255,255,.14); }

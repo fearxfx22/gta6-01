@@ -1,8 +1,18 @@
-// Combat: hitscan pistol with tracers, muzzle flash and hitmarkers (fps-shooter
+// Combat: hitscan pistol with tracers, muzzle flash and hitmarkers (FPS
 // patterns), plus the armed rivals who shoot back. Shooting is on foot only.
+//
+// The aim problem: the camera looks down at the player from behind, so its
+// centre ray dives into the ground a few metres ahead — a shot fired along it
+// would never reach a standing target. So the pistol aims at the first thing
+// the camera ray actually hits; if that is the ground close by, it aims at
+// the ray's far point clamped to torso height, then fires from the muzzle
+// toward that point and raycasts the real hit from there.
 import * as THREE from 'three';
 import { COMBAT } from './config.js';
 import { makePersonMesh } from './player.js';
+
+const TRACER_POOL = 10;
+const TRACER_LIFE = 0.07;
 
 export function createCombat(scene, world, rng) {
   const raycaster = new THREE.Raycaster();
@@ -13,7 +23,7 @@ export function createCombat(scene, world, rng) {
   // Tracer pool: thin glowing boxes stretched between muzzle and impact.
   const tracers = [];
   const tracerMat = new THREE.MeshBasicMaterial({ color: 0xffe27a, transparent: true, opacity: 0 });
-  for (let i = 0; i < 10; i += 1) {
+  for (let i = 0; i < TRACER_POOL; i += 1) {
     const m = new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.035, 1), tracerMat.clone());
     m.visible = false;
     scene.add(m);
@@ -31,11 +41,13 @@ export function createCombat(scene, world, rng) {
     t.mesh.scale.set(1, 1, len);
     t.mesh.material.opacity = 0.9;
     t.mesh.visible = true;
-    t.life = 0.07;
+    t.life = TRACER_LIFE;
   }
 
   function tagShootable(group, ref) {
-    group.traverse((o) => { o.userData.shootable = ref; });
+    group.traverse((o) => {
+      o.userData.shootable = ref;
+    });
   }
 
   function spawnEnemy(x, z) {
@@ -43,8 +55,14 @@ export function createCombat(scene, world, rng) {
     mesh.position.set(x, 0, z);
     scene.add(mesh);
     const e = {
-      mesh, x, z, hp: 100, heading: 0,
-      shootTimer: rng.range(0.5, 1.5), dead: false, fade: 0,
+      mesh,
+      x,
+      z,
+      hp: 100,
+      heading: 0,
+      shootTimer: rng.range(0.5, 1.5),
+      dead: false,
+      fade: 0,
       kind: 'enemy',
     };
     tagShootable(mesh, e);
@@ -55,12 +73,13 @@ export function createCombat(scene, world, rng) {
   function killEnemy(e, G) {
     e.dead = true;
     e.fade = 5;
-    e.mesh.rotation.x = -Math.PI / 2 * 0.92;
+    e.mesh.rotation.x = (-Math.PI / 2) * 0.92;
     e.mesh.position.y = 0.3;
     G.effects.blood(e.x, 1, e.z);
     G.audio.kill();
   }
 
+  /** Everything a bullet can hit: enemies, cops, peds, and every car. */
   function shootableList(G) {
     const list = [];
     for (const e of enemies) if (!e.dead) list.push(e.mesh);
@@ -72,6 +91,45 @@ export function createCombat(scene, world, rng) {
     return list;
   }
 
+  /** Work out what was hit and apply the consequence. Returns true on a hit. */
+  function applyHit(hit, G) {
+    const ref = hit.object.userData.shootable;
+    const dist = hit.distance;
+    const falloff = dist < 20 ? 1 : Math.max(0.45, 1 - (dist - 20) / 70);
+    if (!ref) {
+      G.effects.sparks(hit.point.x, hit.point.y, hit.point.z);
+      return false;
+    }
+    if (ref.kind === 'enemy') {
+      const head = hit.point.y - ref.mesh.position.y > 1.5;
+      ref.hp -= COMBAT.pistolDamage * falloff * (head ? COMBAT.headshotMult : 1);
+      G.effects.blood(hit.point.x, hit.point.y, hit.point.z);
+      if (ref.hp <= 0) killEnemy(ref, G);
+      return true;
+    }
+    if (ref.kind === 'cop') {
+      // Shooting a cop is a fast way to five stars.
+      G.addWanted(2);
+      G.effects.blood(hit.point.x, hit.point.y, hit.point.z);
+      G.police.killCop(ref);
+      G.audio.kill();
+      return true;
+    }
+    if (ref.state !== undefined) {
+      // A pedestrian.
+      G.addWanted(1);
+      G.pedestrians.knockDown(ref, true);
+      return true;
+    }
+    if (ref.pos) {
+      // A car.
+      G.effects.sparks(hit.point.x, hit.point.y, hit.point.z);
+      return true;
+    }
+    G.effects.sparks(hit.point.x, hit.point.y, hit.point.z);
+    return false;
+  }
+
   return {
     enemies,
     spawnEnemy,
@@ -79,12 +137,6 @@ export function createCombat(scene, world, rng) {
       for (const e of enemies) scene.remove(e.mesh);
       enemies.length = 0;
     },
-    // One shot from the player's pistol. The camera looks down at the player,
-    // so its centre ray dives into the ground a few metres ahead — a shot fired
-    // along it would never reach a standing target. Instead: aim at the first
-    // thing the camera ray actually hits; if that is the ground close by, aim
-    // at the ray's far point clamped to torso height, then fire from the muzzle
-    // toward that point and raycast the real hit from there.
     shoot(G) {
       const player = G.player;
       const camera = G.rig.camera;
@@ -115,33 +167,7 @@ export function createCombat(scene, world, rng) {
       if (hits.length) {
         const h = hits[0];
         end = h.point.clone();
-        const ref = h.object.userData.shootable;
-        const dist = h.distance;
-        const falloff = dist < 20 ? 1 : Math.max(0.45, 1 - (dist - 20) / 70);
-        if (ref) {
-          hitAny = true;
-          if (ref.kind === 'enemy') {
-            const head = h.point.y - ref.mesh.position.y > 1.5;
-            ref.hp -= COMBAT.pistolDamage * falloff * (head ? COMBAT.headshotMult : 1);
-            G.effects.blood(h.point.x, h.point.y, h.point.z);
-            if (ref.hp <= 0) killEnemy(ref, G);
-          } else if (ref.kind === 'cop') {
-            // Shooting a cop is a fast way to five stars.
-            G.addWanted(2);
-            G.effects.blood(h.point.x, h.point.y, h.point.z);
-            G.police.killCop(ref);
-            G.audio.kill();
-          } else if (ref.state !== undefined) {
-            // A pedestrian.
-            G.addWanted(1);
-            G.pedestrians.knockDown(ref, true);
-          } else if (ref.pos) {
-            // A car.
-            G.effects.sparks(h.point.x, h.point.y, h.point.z);
-          }
-        } else {
-          G.effects.sparks(h.point.x, h.point.y, h.point.z);
-        }
+        hitAny = applyHit(h, G);
       }
       fireTracer(muzzle, end);
       G.effects.muzzle(muzzle.x, muzzle.y, muzzle.z);
@@ -156,7 +182,7 @@ export function createCombat(scene, world, rng) {
       for (const t of tracers) {
         if (t.life > 0) {
           t.life -= dt;
-          t.mesh.material.opacity = Math.max(0, t.life / 0.07) * 0.9;
+          t.mesh.material.opacity = Math.max(0, t.life / TRACER_LIFE) * 0.9;
           if (t.life <= 0) t.mesh.visible = false;
         }
       }
@@ -170,19 +196,29 @@ export function createCombat(scene, world, rng) {
         const e = enemies[i];
         if (e.dead) {
           e.fade -= dt;
-          if (e.fade <= 0) { scene.remove(e.mesh); enemies.splice(i, 1); }
+          if (e.fade <= 0) {
+            scene.remove(e.mesh);
+            enemies.splice(i, 1);
+          }
           continue;
         }
         const player = G.player;
-        const dx = player.pos.x - e.x, dz = player.pos.z - e.z;
+        const dx = player.pos.x - e.x;
+        const dz = player.pos.z - e.z;
         const dist = Math.hypot(dx, dz);
         if (dist > 60 || player.dead) continue;
         e.heading = Math.atan2(dx, dz);
         // Hold 12-25 m: close in when far, back off when close.
-        if (dist > 25) { e.x += Math.sin(e.heading) * 3.4 * dt; e.z += Math.cos(e.heading) * 3.4 * dt; }
-        else if (dist < 10) { e.x -= Math.sin(e.heading) * 2 * dt; e.z -= Math.cos(e.heading) * 2 * dt; }
+        if (dist > 25) {
+          e.x += Math.sin(e.heading) * 3.4 * dt;
+          e.z += Math.cos(e.heading) * 3.4 * dt;
+        } else if (dist < 10) {
+          e.x -= Math.sin(e.heading) * 2 * dt;
+          e.z -= Math.cos(e.heading) * 2 * dt;
+        }
         const solved = world.resolveCircle(e.x, e.z, 0.5);
-        e.x = solved.x; e.z = solved.z;
+        e.x = solved.x;
+        e.z = solved.z;
         e.mesh.position.set(e.x, 0, e.z);
         e.mesh.rotation.y = e.heading;
         e.shootTimer -= dt;
