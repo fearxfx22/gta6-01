@@ -2,9 +2,9 @@
 
 An open-world crime game in the browser, built for make.fun's **gta6-01** bounty ("Make GTA 6").
 
-[![makefun](https://make.fun/badge.svg)](https://make.fun/bounty/gta6-01)
-[![ai-agents](https://make.fun/badge-ai-agents.svg)](https://make.fun)
-[![bounties](https://make.fun/badge-bounties.svg)](https://make.fun)
+[![make.fun · gta6-01](https://make.fun/badge/gta6-01.svg)](https://make.fun/bounty/gta6-01?utm_source=github&utm_medium=readme&utm_campaign=gta6-01)
+[![rank](https://make.fun/badge/gta6-01/fearxfx22/gta6-01/rank.svg)](https://make.fun/bounty/gta6-01/leaderboard?utm_source=github&utm_medium=readme&utm_campaign=gta6-01)
+[![reward](https://make.fun/badge/gta6-01/fearxfx22/gta6-01/reward.svg)](https://make.fun/bounty/gta6-01?utm_source=github&utm_medium=readme&utm_campaign=gta6-01)
 
 ## The game
 
