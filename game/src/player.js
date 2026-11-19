@@ -1,169 +1,116 @@
-// Rex Dalton on foot: camera-relative WASD movement, sprint, jump, and a
-// simple low-poly character whose limbs swing with the stride. Health and
-// regen live here too — the player is the only thing in the game that can
-// die on foot (getting wasted ends the run).
+// Rex, the player, on foot: a third-person walker with a run, a jump, and
+// health. Movement is camera-relative (W walks away from the camera), the
+// model turns toward its travel direction, and a simple circle-vs-building
+// resolve keeps Rex out of walls. The same module owns the "enter car"
+// hand-off: it only decides when the player is close enough to a car.
+
 import * as THREE from 'three';
-import { PLAYER } from './config.js';
-import { angleDiff, clamp } from './random.js';
+import { clamp, lerp, wrapAngle, angleDelta, smoothFactor } from './util.js';
+import { resolveCircle } from './city.js';
 
-/** One box limb of a low-poly person, pivoted at its top edge. */
-function limb(w, h, d, color, x, y) {
-  const m = new THREE.Mesh(
-    new THREE.BoxGeometry(w, h, d),
-    new THREE.MeshStandardMaterial({ color, roughness: 0.9 }),
-  );
-  m.position.set(x, y, 0);
-  m.castShadow = true;
-  return m;
-}
-
-/** A low-poly person: legs, torso, arms, head, cap. Limbs live in userData. */
-export function makePersonMesh(jacket, pants, skin) {
+export function makePlayer() {
   const g = new THREE.Group();
-  const legL = limb(0.26, 0.78, 0.3, pants, -0.16, 0.39);
-  const legR = limb(0.26, 0.78, 0.3, pants, 0.16, 0.39);
-  const torso = limb(0.72, 0.72, 0.4, jacket, 0, 1.16);
-  const armL = limb(0.2, 0.62, 0.24, jacket, -0.48, 1.2);
-  const armR = limb(0.2, 0.62, 0.24, jacket, 0.48, 1.2);
-  const head = new THREE.Mesh(
-    new THREE.SphereGeometry(0.26, 12, 10),
-    new THREE.MeshStandardMaterial({ color: skin, roughness: 0.7 }),
-  );
-  head.position.y = 1.78;
+  const skin = new THREE.MeshStandardMaterial({ color: 0xd8a07a, roughness: 0.8 });
+  const jacket = new THREE.MeshStandardMaterial({ color: 0x2e4a6b, roughness: 0.85 });
+  const jeans = new THREE.MeshStandardMaterial({ color: 0x2a2d33, roughness: 0.9 });
+  const legs = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.85, 0.28), jeans);
+  legs.position.y = 0.43;
+  g.add(legs);
+  const torso = new THREE.Mesh(new THREE.BoxGeometry(0.56, 0.66, 0.32), jacket);
+  torso.position.y = 1.16;
+  torso.castShadow = true;
+  g.add(torso);
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.26, 12, 10), skin);
+  head.position.y = 1.72;
   head.castShadow = true;
-  const cap = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.27, 0.28, 0.12, 12),
-    new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.8 }),
-  );
-  cap.position.y = 1.98;
-  g.add(legL, legR, torso, armL, armR, head, cap);
-  g.userData = { legL, legR, armL, armR, torso, head };
+  g.add(head);
+  const hair = new THREE.Mesh(new THREE.SphereGeometry(0.27, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0x1a1410, roughness: 1 }));
+  hair.position.y = 1.76;
+  g.add(hair);
+  const armGeo = new THREE.BoxGeometry(0.14, 0.6, 0.14);
+  const armL = new THREE.Mesh(armGeo, jacket);
+  armL.position.set(-0.36, 1.16, 0);
+  g.add(armL);
+  const armR = new THREE.Mesh(armGeo, jacket);
+  armR.position.set(0.36, 1.16, 0);
+  g.add(armR);
+  g.userData = {
+    heading: 0,
+    speed: 0,
+    vy: 0,
+    onGround: true,
+    health: 100,
+    maxHealth: 100,
+    armL, armR,
+    walkPhase: 0,
+    aiming: false,
+  };
   return g;
 }
 
-export function createPlayer(scene, world) {
-  const mesh = makePersonMesh(0x8a2f23, 0x2a3242, 0xc98a5a);
-  scene.add(mesh);
-  const pos = new THREE.Vector3(-150, 0, 132);
-  const vel = new THREE.Vector3();
-  let heading = Math.PI;
-  let vy = 0;
-  let onGround = true;
-  let health = PLAYER.health;
-  let lastHurt = -99;
-  let walkPhase = 0;
-  let time = 0;
-  let dead = false;
-
-  function damage(amount, when) {
-    if (dead) return;
-    health -= amount;
-    lastHurt = when;
-    if (health <= 0) {
-      health = 0;
-      dead = true;
+// input: {forward, strafe, run, jump} in [-1,1]/booleans, camYaw is the
+// camera's yaw. Moves Rex, resolves walls, and animates the limbs.
+export function updatePlayer(player, input, camYaw, colliders, dt) {
+  const u = player.userData;
+  const walkSpeed = input.run ? 8.2 : 4.6;
+  // Camera-relative movement: forward is away from the camera.
+  const sin = Math.sin(camYaw);
+  const cos = Math.cos(camYaw);
+  let mx = -sin * input.forward + cos * input.strafe;
+  let mz = -cos * input.forward - sin * input.strafe;
+  const len = Math.hypot(mx, mz);
+  if (len > 1) { mx /= len; mz /= len; }
+  const targetSpeed = len * walkSpeed;
+  u.speed = lerp(u.speed, targetSpeed, smoothFactor(10, dt));
+  let nx = player.position.x + mx * u.speed * dt;
+  let nz = player.position.z + mz * u.speed * dt;
+  // Keep Rex inside the playable bounds.
+  nx = clamp(nx, -186, 186);
+  nz = clamp(nz, -186, 186);
+  [nx, nz] = resolveCircle(colliders, nx, nz, 0.6);
+  player.position.x = nx;
+  player.position.z = nz;
+  // Face the travel direction, turning smoothly.
+  if (len > 0.1) {
+    const want = Math.atan2(mx, mz);
+    player.rotation.y += angleDelta(player.rotation.y, want) * smoothFactor(12, dt);
+    u.heading = player.rotation.y;
+  }
+  // Jump + gravity.
+  if (input.jump && u.onGround) {
+    u.vy = 7.5;
+    u.onGround = false;
+  }
+  if (!u.onGround) {
+    u.vy -= 22 * dt;
+    player.position.y += u.vy * dt;
+    if (player.position.y <= 0) {
+      player.position.y = 0;
+      u.vy = 0;
+      u.onGround = true;
     }
   }
+  // Limb swing while moving; arms raise while aiming.
+  u.walkPhase += dt * (2 + Math.abs(u.speed) * 1.6);
+  const swing = Math.sin(u.walkPhase) * clamp(Math.abs(u.speed) / 4.6, 0, 1) * 0.55;
+  if (u.aiming) {
+    u.armR.rotation.x = -1.35;
+    u.armL.rotation.x = -1.1;
+  } else {
+    u.armL.rotation.x = swing;
+    u.armR.rotation.x = -swing;
+  }
+  return u.speed;
+}
 
-  return {
-    mesh,
-    pos,
-    get heading() {
-      return heading;
-    },
-    get health() {
-      return health;
-    },
-    get dead() {
-      return dead;
-    },
-    get speed() {
-      return Math.hypot(vel.x, vel.z);
-    },
-    setHeading(h) {
-      heading = h;
-      mesh.rotation.y = h;
-    },
-    reset(x, z) {
-      pos.set(x, 0, z);
-      mesh.position.copy(pos);
-      mesh.rotation.x = 0; // stand back up after being wasted
-      vel.set(0, 0, 0);
-      vy = 0;
-      health = PLAYER.health;
-      dead = false;
-      lastHurt = -99;
-    },
-    damage,
-    update(dt, input, camYaw) {
-      time += dt;
-      if (dead) {
-        mesh.rotation.x = (-Math.PI / 2) * 0.9; // lying on the ground
-        return;
-      }
-      const ax = input.axis();
-      const sprint = input.down('ShiftLeft') || input.down('ShiftRight');
-      const maxSpeed = sprint ? PLAYER.sprintSpeed : PLAYER.walkSpeed;
-      // Camera-relative move direction: W walks away from the camera.
-      const sin = Math.sin(camYaw);
-      const cos = Math.cos(camYaw);
-      let mx = ax.x * cos + ax.z * sin;
-      let mz = -ax.x * sin + ax.z * cos;
-      const len = Math.hypot(mx, mz);
-      if (len > 0) {
-        mx /= len;
-        mz /= len;
-      }
-      vel.x += mx * PLAYER.accel * dt;
-      vel.z += mz * PLAYER.accel * dt;
-      const sp = Math.hypot(vel.x, vel.z);
-      const cap = len > 0 ? maxSpeed : 0;
-      if (sp > cap) {
-        const f = Math.max(cap, sp - PLAYER.accel * 1.4 * dt) / sp;
-        vel.x *= f;
-        vel.z *= f;
-      }
-      // Face the direction of travel, turning at most 9 rad/s.
-      if (len > 0.1) {
-        const target = Math.atan2(vel.x, vel.z);
-        heading += clamp(angleDiff(heading, target), -9 * dt, 9 * dt);
-      }
-      pos.x += vel.x * dt;
-      pos.z += vel.z * dt;
-      const solved = world.resolveCircle(pos.x, pos.z, PLAYER.radius);
-      pos.x = solved.x;
-      pos.z = solved.z;
-      pos.x = clamp(pos.x, -215, 300);
-      pos.z = clamp(pos.z, -300, 300);
-      // Jump + gravity (flat ground, y = 0).
-      if (onGround && input.down('Space')) {
-        vy = PLAYER.jumpSpeed;
-        onGround = false;
-      }
-      vy -= PLAYER.gravity * dt;
-      pos.y += vy * dt;
-      if (pos.y <= 0) {
-        pos.y = 0;
-        vy = 0;
-        onGround = true;
-      }
-      // Regen after a quiet stretch.
-      if (time - lastHurt > PLAYER.regenDelay && health < PLAYER.health) {
-        health = Math.min(PLAYER.health, health + PLAYER.regenRate * dt);
-      }
-      // Walk cycle + a small vertical bob while moving.
-      const moving = Math.hypot(vel.x, vel.z);
-      walkPhase += moving * dt * 1.9;
-      const swing = Math.min(1, moving / 4) * Math.sin(walkPhase) * 0.55;
-      const bob = Math.min(1, moving / 4) * Math.abs(Math.sin(walkPhase)) * 0.07;
-      const u = mesh.userData;
-      u.legL.rotation.x = swing;
-      u.legR.rotation.x = -swing;
-      u.armL.rotation.x = -swing * 0.8;
-      u.armR.rotation.x = swing * 0.8;
-      mesh.position.set(pos.x, pos.y + bob, pos.z);
-      mesh.rotation.y = heading;
-      mesh.rotation.x = 0;
-    },
-  };
+export function damagePlayer(player, amount) {
+  const u = player.userData;
+  u.health = clamp(u.health - amount, 0, u.maxHealth);
+  return u.health;
+}
+
+export function healPlayer(player, amount) {
+  const u = player.userData;
+  u.health = clamp(u.health + amount, 0, u.maxHealth);
+  return u.health;
 }

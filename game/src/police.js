@@ -1,211 +1,163 @@
-// The Solmar Bay police: cruisers that spawn on the road graph and chase the
-// player (ramming when he drives), foot cops who close in to arrest him, and
-// the wanted level that cools down when nobody can see him.
-//
-// Heat scales with stars: two cruisers per star up to the configured maximum,
-// foot cops from two stars up. The nearest police distance drives the wanted
-// cooldown — lose sight of them long enough and the stars tick down one at a
-// time. A cruiser the player stole is his now, never a chaser.
+// The wanted system for Solmar Bay: a 0-5 star level, police cars that
+// spawn at the city edge and chase (game-ai FSM: patrol -> chase -> ram),
+// and the bust/escape rules. Wanted rises with crimes (stealing a car,
+// shooting, killing crew) and drains when no police unit can see the player
+// for a while — that drain is what the Hot Pursuit mission is built on.
+
 import * as THREE from 'three';
-import { POLICE, WANTED } from './config.js';
-import { makePersonMesh } from './player.js';
-import { stepCar } from './vehicles.js';
-import { angleDiff, clamp } from './random.js';
+import { makeCar, driveCar, coastToStop, flashLightBar } from './vehicles.js';
+import { clamp, lerp, angleDelta, dist2D, smoothFactor, WORLD, roadCoord } from './util.js';
 
-export function createPolice(scene, world, vehicles, rng) {
-  const cruisers = []; // {car}
-  const cops = []; // {mesh, x, z, heading, bustTimer, phase, kind}
-  let quietTime = 0;
-  let ramCooldown = 0;
-  let nearestDist = Infinity;
+export const WANTED_MAX = 5;
 
-  /** A cruiser appears on a road node 70-110 m from the player. */
-  function spawnCruiser(playerPos) {
-    let nodeId = -1;
-    let tries = 0;
-    while (tries < 12) {
-      const cand = rng.int(0, world.nodes.length - 1);
-      const n = world.nodes[cand];
-      const d = Math.hypot(n.x - playerPos.x, n.z - playerPos.z);
-      if (d > POLICE.spawnDist && d < 130) {
-        nodeId = cand;
-        break;
-      }
-      tries += 1;
-    }
-    if (nodeId < 0) nodeId = world.nearestNode(playerPos.x, playerPos.z);
-    const node = world.nodes[nodeId];
-    const car = vehicles.spawnCar('police', 0xe8e8e8, node.x, node.z, rng.range(0, Math.PI * 2), false);
-    car.driver = 'police';
-    cruisers.push({ car });
-    return car;
-  }
+// How many police cars hunt at each wanted level.
+const UNITS_AT_LEVEL = [0, 1, 2, 3, 4, 5];
 
-  /** A foot cop appears 14-24 m from the player, in a random direction. */
-  function spawnCop(playerPos) {
-    const mesh = makePersonMesh(0x1a2a4a, 0x1a1a22, 0xc98a5a);
-    const a = rng.range(0, Math.PI * 2);
-    const x = playerPos.x + Math.cos(a) * rng.range(14, 24);
-    const z = playerPos.z + Math.sin(a) * rng.range(14, 24);
-    mesh.position.set(x, 0, z);
-    scene.add(mesh);
-    const cop = { mesh, x, z, heading: 0, bustTimer: 0, phase: 0, kind: 'cop' };
-    mesh.traverse((o) => {
-      o.userData.shootable = cop;
-    });
-    cops.push(cop);
-  }
-
-  function removeCruiser(i) {
-    const c = cruisers[i];
-    scene.remove(c.car.mesh);
-    const idx = vehicles.cars.indexOf(c.car);
-    if (idx >= 0) vehicles.cars.splice(idx, 1);
-    cruisers.splice(i, 1);
-  }
-
-  function removeCop(i) {
-    scene.remove(cops[i].mesh);
-    cops.splice(i, 1);
-  }
-
-  /** Chase one cruiser toward its target, ramming the player's car on contact. */
-  function chaseCruiser(car, G, dt) {
-    // The player stole this cruiser: it is theirs now, not a chaser.
-    if (car.driver === 'player') return;
-    const player = G.player;
-    const target = G.driving ? G.driving : player;
-    const ahead = G.driving ? 1.1 : 0;
-    const tx = target.pos.x + Math.sin(target.heading || 0) * (target.speed || 0) * ahead;
-    const tz = target.pos.z + Math.cos(target.heading || 0) * (target.speed || 0) * ahead;
-    const dx = tx - car.pos.x;
-    const dz = tz - car.pos.z;
-    const wantHeading = Math.atan2(dx, dz);
-    const dh = angleDiff(car.heading, wantHeading);
-    const dist = Math.hypot(dx, dz);
-    const throttle = dist < 6 ? 0.4 : 1;
-    stepCar(car, dt, { throttle, steer: clamp(dh * 1.8, -1, 1), handbrake: false });
-    // Ram: a hard hit on the player's car hurts and shakes the camera.
-    if (G.driving && dist < 4.5 && ramCooldown <= 0) {
-      const rel = Math.abs(car.speed - G.driving.speed);
-      if (rel > 4) {
-        player.damage(POLICE.ramDamage, G.time);
-        G.rig.addShake(0.5);
-        G.audio.crash();
-        G.effects.sparks((car.pos.x + G.driving.pos.x) / 2, 1, (car.pos.z + G.driving.pos.z) / 2);
-        ramCooldown = 1;
-      }
-    }
-    // Give up the chase beyond the despawn ring: relocate near the player.
-    if (dist > POLICE.despawnDist) {
-      const node = world.nodes[world.nearestNode(player.pos.x, player.pos.z)];
-      car.pos.set(node.x, 0, node.z);
-      car.vel.set(0, 0, 0);
-      car.speed = 0;
-    }
-  }
-
-  /** Run one foot cop down the player; hold him still to make the arrest. */
-  function updateCop(cop, G, dt) {
-    const player = G.player;
-    const dx = player.pos.x - cop.x;
-    const dz = player.pos.z - cop.z;
-    const dist = Math.hypot(dx, dz);
-    if (dist > POLICE.despawnDist) return false; // gone: remove
-    const speed = G.driving ? 5.5 : 5.8;
-    if (dist > POLICE.bustDist) {
-      cop.bustTimer = 0;
-      cop.heading = Math.atan2(dx, dz);
-      cop.x += Math.sin(cop.heading) * speed * dt;
-      cop.z += Math.cos(cop.heading) * speed * dt;
-      const solved = world.resolveCircle(cop.x, cop.z, 0.5);
-      cop.x = solved.x;
-      cop.z = solved.z;
-    } else if (!G.driving) {
-      // Close enough, on foot: the arrest timer runs.
-      cop.bustTimer += dt;
-      if (cop.bustTimer > POLICE.bustTime) {
-        G.onBusted();
-        return 'busted';
-      }
-    }
-    cop.phase += speed * dt * 2.2;
-    const swing = Math.sin(cop.phase) * 0.5;
-    const u = cop.mesh.userData;
-    u.legL.rotation.x = swing;
-    u.legR.rotation.x = -swing;
-    u.armL.rotation.x = -swing * 0.8;
-    u.armR.rotation.x = swing * 0.8;
-    cop.mesh.position.set(cop.x, 0, cop.z);
-    cop.mesh.rotation.y = cop.heading;
-    return true;
-  }
-
+export function makeWanted() {
   return {
-    cruisers,
-    cops,
-    get nearestDist() {
-      return nearestDist;
-    },
-    clear() {
-      while (cruisers.length) removeCruiser(0);
-      while (cops.length) removeCop(0);
-      nearestDist = Infinity;
-      quietTime = 0;
-    },
-    killCop(cop) {
-      const i = cops.indexOf(cop);
-      if (i >= 0) removeCop(i);
-    },
-    update(dt, G) {
-      const player = G.player;
-      const wanted = G.wanted;
-      const px = player.pos.x;
-      const pz = player.pos.z;
-      ramCooldown = Math.max(0, ramCooldown - dt);
-
-      // Nearest police distance drives the wanted cooldown.
-      nearestDist = Infinity;
-      for (const c of cruisers) {
-        nearestDist = Math.min(nearestDist, Math.hypot(c.car.pos.x - px, c.car.pos.z - pz));
-      }
-      for (const c of cops) {
-        nearestDist = Math.min(nearestDist, Math.hypot(c.x - px, c.z - pz));
-      }
-
-      // Wanted cools down when the heat cannot see the player.
-      if (wanted > 0) {
-        if (nearestDist > 55) {
-          quietTime += dt;
-          if (quietTime > WANTED.decaySeconds) {
-            G.setWanted(wanted - 1);
-            quietTime = 0;
-          }
-        } else quietTime = 0;
-      } else quietTime = 0;
-
-      // Spawn to the wanted level; stand down when it clears. The heat
-      // scales: two cruisers per star, up to the configured maximum.
-      const wantCars = wanted === 0 ? 0 : Math.min(wanted * 2, POLICE.maxCars);
-      while (cruisers.length < wantCars) spawnCruiser(player.pos);
-      // Stand down from the end, but never impound the cruiser the player
-      // is driving — that would leave them in an invisible car.
-      while (cruisers.length > wantCars) {
-        let idx = cruisers.length - 1;
-        while (idx >= 0 && cruisers[idx].car.driver === 'player') idx -= 1;
-        if (idx < 0) break;
-        removeCruiser(idx);
-      }
-      const wantCops = wanted >= 2 ? Math.min(wanted, 4) : 0;
-      while (cops.length < wantCops) spawnCop(player.pos);
-      while (cops.length > wantCops) removeCop(cops.length - 1);
-
-      for (const { car } of cruisers) chaseCruiser(car, G, dt);
-      for (let i = cops.length - 1; i >= 0; i -= 1) {
-        const result = updateCop(cops[i], G, dt);
-        if (result === 'busted') return;
-        if (result === false) removeCop(i);
-      }
-    },
+    level: 0,
+    heat: 0, // 0..100 inside the current level; 100 pushes a level up
+    unseenTimer: 0, // seconds since any unit saw the player
+    busted: 0, // 0..1 arrest progress while a unit is close and the player is slow
   };
+}
+
+export function addHeat(wanted, amount) {
+  wanted.heat += amount;
+  while (wanted.heat >= 100 && wanted.level < WANTED_MAX) {
+    wanted.heat -= 100;
+    wanted.level += 1;
+  }
+  wanted.heat = clamp(wanted.heat, 0, 100);
+}
+
+export function setWanted(wanted, level) {
+  wanted.level = clamp(level, 0, WANTED_MAX);
+  wanted.heat = 0;
+  wanted.unseenTimer = 0;
+}
+
+// Spawn a police unit at a road edge away from the player.
+function spawnUnit(scene, rng, playerPos) {
+  const edge = Math.floor(rng() * 4);
+  let x, z;
+  if (edge === 0) { x = playerPos.x + (rng() < 0.5 ? -70 : 70); z = playerPos.z - 60; }
+  else if (edge === 1) { x = playerPos.x + (rng() < 0.5 ? -70 : 70); z = playerPos.z + 60; }
+  else if (edge === 2) { x = playerPos.x - 60; z = playerPos.z + (rng() < 0.5 ? -70 : 70); }
+  else { x = playerPos.x + 60; z = playerPos.z + (rng() < 0.5 ? -70 : 70); }
+  x = clamp(x, -WORLD.halfCity, WORLD.halfCity);
+  z = clamp(z, -WORLD.halfCity, WORLD.halfCity);
+  const car = makeCar(0xe8e8e8, { x, z, police: true, maxSpeed: 27 + Math.random() * 4 });
+  scene.add(car);
+  return { mesh: car, state: 'chase', repath: 0, stuck: 0, lastX: x, lastZ: z };
+}
+
+export function makePolice(scene) {
+  return { units: [], scene, spawnTimer: 0 };
+}
+
+// Keep the number of units matched to the wanted level, spawning at the
+// edges and removing them when the heat dies down.
+export function updatePolice(police, wanted, playerPos, playerSpeed, playerInCar, colliders, dt, time, rng) {
+  const want = UNITS_AT_LEVEL[wanted.level];
+  // Spawn up to the wanted count, one at a time.
+  police.spawnTimer -= dt;
+  if (police.units.length < want && police.spawnTimer <= 0) {
+    police.units.push(spawnUnit(police.scene, rng, playerPos));
+    police.spawnTimer = 2.5;
+  }
+  // Remove extra units once the wanted level falls.
+  while (police.units.length > want) {
+    const u = police.units.pop();
+    police.scene.remove(u.mesh);
+  }
+
+  let anySeen = false;
+  for (const u of police.units) {
+    const m = u.mesh;
+    const d = dist2D(m.position.x, m.position.z, playerPos.x, playerPos.z);
+    const seen = d < 90;
+    if (seen) anySeen = true;
+    // Chase: steer toward the player, full throttle, ram at close range.
+    const wantHeading = Math.atan2(playerPos.x - m.position.x, playerPos.z - m.position.z);
+    const steer = clamp(angleDelta(m.userData.heading, wantHeading) * 1.8, -1, 1);
+    let throttle = 1;
+    if (d < 6) throttle = 1; // ram
+    else if (d > 120) throttle = 1;
+    driveCar(m, throttle, steer, dt);
+    // Nudge out of buildings.
+    const [nx, nz] = pushOutOfBuildings(m.position.x, m.position.z, colliders);
+    m.position.x = nx;
+    m.position.z = nz;
+    flashLightBar(m, time);
+    // Stuck detection: if the car barely moved for 2s, teleport it to a
+    // nearby road so the chase never stalls behind a building.
+    const moved = dist2D(m.position.x, m.position.z, u.lastX, u.lastZ);
+    if (moved < 0.4) u.stuck += dt; else u.stuck = 0;
+    u.lastX = m.position.x;
+    u.lastZ = m.position.z;
+    if (u.stuck > 2.5) {
+      m.position.x = clamp(playerPos.x + (rng() < 0.5 ? -55 : 55), -WORLD.halfCity, WORLD.halfCity);
+      m.position.z = clamp(playerPos.z - 45, -WORLD.halfCity, WORLD.halfCity);
+      m.userData.speed = 0;
+      u.stuck = 0;
+    }
+    // Damage the player on a hard ram.
+    if (d < 3.4 && Math.abs(m.userData.speed) > 6) {
+      u.ramCooldown = (u.ramCooldown ?? 0) - dt;
+      if (u.ramCooldown <= 0) {
+        u.ramCooldown = 1.2;
+        u.ramHit = true;
+      }
+    }
+  }
+
+  // Wanted drains while nobody sees the player; the bust meter fills while
+  // a unit sits on top of a slow player.
+  if (wanted.level > 0) {
+    if (anySeen) {
+      wanted.unseenTimer = 0;
+    } else {
+      wanted.unseenTimer += dt;
+      if (wanted.unseenTimer > 6) {
+        wanted.heat -= dt * 7;
+        if (wanted.heat <= 0) {
+          wanted.level -= 1;
+          wanted.heat = wanted.level > 0 ? 60 : 0;
+          wanted.unseenTimer = 0;
+        }
+      }
+    }
+    let closest = Infinity;
+    for (const u of police.units) {
+      closest = Math.min(closest, dist2D(u.mesh.position.x, u.mesh.position.z, playerPos.x, playerPos.z));
+    }
+    const slow = playerInCar ? Math.abs(playerSpeed) < 4 : Math.abs(playerSpeed) < 2;
+    if (closest < 5 && slow) wanted.busted = clamp(wanted.busted + dt * 0.35, 0, 1);
+    else wanted.busted = clamp(wanted.busted - dt * 0.5, 0, 1);
+  }
+  return { anySeen };
+}
+
+// Push a point out of building AABBs (police cars have no full collision).
+function pushOutOfBuildings(x, z, colliders) {
+  for (const b of colliders) {
+    if (x > b.minX - 1 && x < b.maxX + 1 && z > b.minZ - 1 && z < b.maxZ + 1) {
+      const dxl = x - (b.minX - 1);
+      const dxr = (b.maxX + 1) - x;
+      const dzl = z - (b.minZ - 1);
+      const dzr = (b.maxZ + 1) - z;
+      const m = Math.min(dxl, dxr, dzl, dzr);
+      if (m === dxl) x = b.minX - 1;
+      else if (m === dxr) x = b.maxX + 1;
+      else if (m === dzl) z = b.minZ - 1;
+      else z = b.maxZ + 1;
+    }
+  }
+  return [x, z];
+}
+
+export function clearPolice(police) {
+  for (const u of police.units) police.scene.remove(u.mesh);
+  police.units = [];
 }

@@ -1,0 +1,56 @@
+/* Solmar Bay HUD + menus: warm sunset type, glassy dark panels, readable
+   at a glance. The 3D canvas is fullscreen underneath; every panel is
+   pointer-events:none except the buttons. */
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { width: 100%; height: 100%; overflow: hidden; background: #1a1a20; font-family: 'Segoe UI', system-ui, sans-serif; }
+#game { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+
+#hud { position: fixed; inset: 0; pointer-events: none; color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,0.8); z-index: 5; }
+
+#top-left { position: absolute; top: 14px; left: 16px; }
+#health-bar { width: 210px; height: 14px; background: rgba(0,0,0,0.55); border: 1px solid rgba(255,255,255,0.35); border-radius: 3px; overflow: hidden; }
+#health-fill { height: 100%; width: 100%; background: #7dc86a; transition: width 0.2s; }
+#health-text { font-size: 12px; margin-top: 2px; color: #e8e8e8; }
+#stars { font-size: 24px; letter-spacing: 3px; color: #ffd76a; margin-top: 4px; }
+#cash { font-size: 22px; font-weight: 700; color: #7dc86a; margin-top: 2px; }
+#location { font-size: 13px; color: #ffd98a; letter-spacing: 1px; text-transform: uppercase; }
+
+#top-right { position: absolute; top: 14px; right: 16px; text-align: right; }
+#minimap { border: 2px solid rgba(255,255,255,0.4); border-radius: 50%; background: #20242a; box-shadow: 0 2px 12px rgba(0,0,0,0.5); }
+#ammo { font-size: 16px; font-weight: 600; margin-top: 6px; }
+
+#objective { position: absolute; top: 16px; left: 50%; transform: translateX(-50%); max-width: 560px; text-align: center; font-size: 16px; font-weight: 600; background: rgba(0,0,0,0.55); padding: 8px 18px; border-radius: 4px; border-left: 4px solid #ffd76a; }
+
+#messages { position: absolute; left: 16px; bottom: 90px; max-width: 420px; }
+.message { background: rgba(0,0,0,0.6); padding: 7px 12px; margin-top: 6px; border-radius: 4px; font-size: 14px; border-left: 3px solid #ffd76a; }
+
+#dialogue { position: absolute; left: 50%; bottom: 110px; transform: translateX(-50%); width: 620px; max-width: 86vw; background: rgba(10,10,16,0.82); border: 1px solid rgba(255,217,138,0.5); border-radius: 6px; padding: 12px 16px; display: none; }
+#dialogue-name { display: block; color: #ffd76a; font-weight: 700; font-size: 14px; margin-bottom: 4px; }
+#dialogue-text { font-size: 15px; line-height: 1.45; color: #f0ead8; }
+
+#prompt { position: absolute; left: 50%; bottom: 170px; transform: translateX(-50%); background: rgba(0,0,0,0.65); padding: 7px 14px; border-radius: 4px; font-size: 14px; display: none; }
+
+#crosshair { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); font-size: 22px; color: rgba(255,255,255,0.85); }
+
+#controls-hint { position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%); font-size: 12px; color: rgba(255,255,255,0.65); white-space: nowrap; }
+
+/* Menus: full-screen overlays with a warm gradient. */
+#title-screen, #pause-screen, #complete-screen, #busted-screen, #gameover-screen {
+  position: fixed; inset: 0; z-index: 10; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; text-align: center; color: #fff;
+  background: linear-gradient(180deg, rgba(20,12,30,0.72), rgba(60,20,10,0.78));
+  text-shadow: 0 2px 8px rgba(0,0,0,0.7);
+}
+#title-screen h1 { font-size: 84px; letter-spacing: 10px; color: #ffd76a; font-weight: 900; }
+#title-screen .tagline { font-size: 20px; color: #ffb08a; margin: 8px 0 18px; font-style: italic; }
+#title-screen .story { max-width: 560px; font-size: 15px; line-height: 1.6; color: #e8e0d0; margin-bottom: 28px; }
+#title-screen .keys { margin-top: 22px; font-size: 13px; color: rgba(255,255,255,0.65); }
+button { pointer-events: auto; cursor: pointer; font-size: 18px; font-weight: 700; color: #1a1a20; background: #ffd76a; border: none; border-radius: 4px; padding: 12px 34px; margin: 6px; box-shadow: 0 3px 0 #b88a2e; }
+button:hover { background: #ffe08a; }
+button.small { font-size: 13px; padding: 7px 16px; background: transparent; color: rgba(255,255,255,0.7); box-shadow: none; border: 1px solid rgba(255,255,255,0.4); margin-top: 26px; }
+#pause-screen h2, #busted-screen h2, #gameover-screen h2 { font-size: 56px; letter-spacing: 6px; color: #ffd76a; }
+#busted-screen h2 { color: #5a8aff; }
+#gameover-screen h2 { color: #ff5040; }
+#complete-screen h2 { font-size: 44px; color: #7dc86a; }
+#complete-screen p, #pause-screen p, #busted-screen p, #gameover-screen p { font-size: 17px; margin: 12px 0 20px; max-width: 520px; line-height: 1.5; }

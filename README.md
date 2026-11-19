@@ -1,97 +1,70 @@
-# Solmar Bay — Sunset City Stories
+# Solmar Bay
 
-[![gta6-01](https://make.fun/badge/gta6-01.svg)](https://make.fun/c/gta6-01)
-[![rank](https://make.fun/badge/gta6-01/fearxfx22/gta6-01/rank.svg)](https://make.fun/c/gta6-01)
-[![reward](https://make.fun/badge/gta6-01/fearxfx22/gta6-01/reward.svg)](https://make.fun/c/gta6-01)
+An open-world crime game in the browser, built for make.fun's **gta6-01** bounty ("Make GTA 6").
 
-An original open-world crime game that runs in the browser. You play
-**Rex Dalton**, a getaway driver with a debt and a fast car to win back.
-**Vera Solano** has five jobs for you across **Solmar Bay** — a sun-soaked
-coastal city of avenues, a beach, container docks, a marina and a lighthouse.
-Steal cars, lose the police, take out the Tide Kings, and make the sunset run
-before the clock runs out.
+[![makefun](https://make.fun/badge.svg)](https://make.fun/bounty/gta6-01)
+[![ai-agents](https://make.fun/badge-ai-agents.svg)](https://make.fun)
+[![bounties](https://make.fun/badge-bounties.svg)](https://make.fun)
 
-## Play
+## The game
 
-Open `game/index.html` in a desktop browser (or serve the repo with
-`node serve.ts` and open http://localhost:8080). No build step, no network at
-runtime — three.js is vendored under `game/vendor/`, all sound is synthesized
-live with WebAudio.
+Rex came to Solmar Bay with a debt and a borrowed name. **Vera Solano** owns the garage, the docks, and — for now — Rex. Pay her back over five chained jobs, or the city eats you:
+
+1. **First Gear** ($400) — steal any car, deliver it to Vera's Garage.
+2. **The Pickup** ($700) — collect a package at the north docks, deliver it to Marina Cafe. The yard guards call it in.
+3. **Hot Pursuit** ($900) — three stars from the start. Lose the cops, then lay low at Palm Court.
+4. **The Exchange** ($1,200) — take out the four armed Tide Kings crew at the docks, bring the case home.
+5. **Sunset Run** ($2,000) — the case goes to the lighthouse in 150 seconds, with two stars on your tail. Make it, and the debt is clear.
+
+## What is in the world
+
+- A 7×7-block sun-soaked coastal city: Old Town, the Marina, Dockside, Palm Court, The Strip, and Sunset Beach — built fresh from geometry, materials and lighting, no downloaded assets.
+- Explore on foot or by car: steal any car (E), drive with traffic AI, pedestrians on the sidewalks.
+- A wanted level (0–5 stars) with police cars that chase, ram, and arrest.
+- A hitscan pistol with ammo and reload, and armed crew who shoot back.
+- A HUD with health, cash, wanted stars, ammo, a live minimap, and mission objectives. Title, pause, mission-complete, busted and game-over screens. Progress saves to localStorage after every job.
+
+## Controls
 
 | Key | Action |
 | --- | --- |
-| W A S D | Move on foot / drive |
-| Shift | Sprint |
-| E | Enter / steal a car |
-| Mouse drag | Look around |
-| Click | Shoot the pistol |
-| Space | Handbrake (in a car) / jump (on foot) |
-| R | Restart the current mission |
-| Esc | Pause |
+| WASD | Move / drive |
+| Shift | Run |
+| Space | Jump |
+| Mouse | Look |
+| Click | Shoot |
+| E | Steal / exit car |
+| R | Reload |
+| M | Start the next job from Vera |
+| P / Esc | Pause |
 
-## What's in the city
+## Play it
 
-- **Drive and walk** — arcade car physics (drift, handbrake, sand slowdown,
-  brake lights, dust on the beach, tyre squeal on a hard slide) and on-foot
-  movement with a chase camera that widens its field of view as you go faster,
-  across a 7×7-block grid with a beach and ocean to the east, container docks
-  to the north, and a marina and lighthouse to the south.
-- **Traffic and pedestrians** — 14 cars driving the road graph with lane
-  discipline and braking, 24 locals strolling the sidewalks who flee gunshots
-  and fast cars (and get back up after being clipped). Jack a moving car and
-  the AI lets go of the wheel — it's yours now.
-- **Wanted level** — 0 to 5 stars (five stars pulse red). Stealing cars,
-  carjacking, hitting pedestrians and shooting raise it; police cruisers chase
-  and ram — two per star, up to ten — foot cops close in to arrest you. Lose
-  them to cool down. Getting busted or wasted costs 20% of your cash.
-  Crashes at speed throw sparks, a bang and a camera shake.
-- **Combat** — hitscan pistol with tracers, muzzle flash, hitmarkers and
-  headshots; rival gunmen shoot back. Every car is a target, parked or not.
-- **Five missions, one story** — First Gear, The Pickup, Hot Pursuit,
-  The Exchange and Sunset Run, with Vera's dialogue, gold beacons, cash
-  rewards up to $2,000 (shown in the HUD next to the mission name), and a
-  timer on the timed runs.
-- **HUD and save** — health, cash, wanted stars, objective with distance,
-  speedometer, live minimap, and progress saved in the browser
-  (localStorage) with a Continue button on the title screen.
+Serve `game/` with any static server and open `index.html` in desktop Chrome:
 
-## Layout
-
-```
-game/
-  index.html        start screen, HUD, import map
-  src/
-    config.js       tuning: world, player, cars, wanted, police, combat
-    random.js       seeded RNG + math helpers
-    input.js        keyboard + mouse
-    world.js        the city: grid, beach, docks, marina, lighthouse
-    render.js       renderer, lighting, chase camera
-    player.js       Rex on foot
-    vehicles.js     car meshes + arcade physics
-    traffic.js      road-graph traffic AI
-    pedestrians.js  sidewalk locals
-    police.js       cruisers, foot cops, wanted decay
-    combat.js       hitscan pistol + enemy gunmen
-    effects.js      particles, tracers, muzzle flash
-    audio.js        WebAudio synth: engine, sirens, shots, music
-    missions.js     the five jobs + story
-    hud.js          stars, health, cash, minimap, toasts, dialogue
-    save.js         localStorage save / load
-    shots.js        staged screenshot scenes (?shot=chase|street|mission|title)
-  vendor/
-    three.module.min.js   three.js 0.160.0 (vendored)
-main.ts             builds /output: copies game/ + screenshots/, writes dossier.json
+```sh
+cd game && python3 -m http.server 8080
 ```
 
-Everything in the game is original — own city, names, characters, story and
-art. Nothing is borrowed from any existing game.
+No build step, no network requests — every file the game loads lives under `game/`. The three.js library is vendored at `game/vendor/three.module.min.js`.
 
-## Screenshots
+## Structure
 
-1. **chase** — three stars, two cruisers on the sport's tail down the avenue.
-2. **street** — Rex on foot among traffic and pedestrians.
-3. **mission** — The Exchange: the shootout at the container yard.
-4. **title** — the title screen over Solmar Bay at golden hour.
+- `main.ts` — the entry program: copies `game/` and `screenshots/` to `/output` and writes `dossier.json`.
+- `game/index.html` + `game/style.css` — the page and the HUD styling.
+- `game/src/boot.js` — renderer, sunset lighting, input, the game loop, and the `?shot=` screenshot presets.
+- `game/src/city.js` — the city, beach, docks, marina, lighthouse, and props.
+- `game/src/vehicles.js` — car factory and arcade drive physics.
+- `game/src/traffic.js` — traffic AI and pedestrian routines.
+- `game/src/player.js` — Rex on foot.
+- `game/src/police.js` — the wanted system and police chases.
+- `game/src/weapons.js` — the hitscan pistol and the enemy crew.
+- `game/src/missions.js` — the five jobs, Vera's dialogue, and the rewards.
+- `game/src/hud.js` — HUD, minimap, menus, and messages.
+- `game/src/save.js` — localStorage saves.
+- `game/src/camera.js` — the third-person follow camera.
+- `game/src/util.js` — the seeded RNG and world constants.
 
-Screenshots are real renders of this game, taken in desktop Chrome from the
-staged scenes in `shots.json` (`?shot=chase|street|mission|title&seed=1`).
+## License
+
+MIT — see [LICENSE](LICENSE).

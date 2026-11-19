@@ -1,275 +1,291 @@
-// The story: five jobs for Vera Solano across Solmar Bay. Each mission is a
-// list of steps — go somewhere, get in a car, lose the heat, take out a crew,
-// beat a clock — with a gold beacon in the world and on the minimap, Vera's
-// dialogue, and a cash reward at the end. Progress is saved after every job.
-//
-// Step types: goto (reach a circle), enterCar (steal any car), escape (drop
-// to zero stars), killAll (clear the spawned crew). A step with `seconds`
-// runs a countdown — run out and Vera makes you start the job over.
+// Missions for Solmar Bay: Rex owes Vera Solano a debt, and pays it off
+// over five chained jobs. Each mission is a list of steps — go somewhere,
+// get in a car, deliver, escape the law, clear out a crew, beat a clock —
+// with Vera's dialogue between them. The module owns the mission state,
+// the 3D beacon marker, the crew for The Exchange, and the rewards.
+
 import * as THREE from 'three';
-import { MISSION_REWARDS } from './config.js';
-import { writeSave } from './save.js';
+import { dist2D, clamp, PLACES } from './util.js';
+import { makeCrewMember } from './weapons.js';
+import { setWanted, addHeat } from './police.js';
 
-const DOCKS = { x: 60, z: -262 };
-
-const MISSIONS = [
+const MISSION_DEFS = [
   {
+    id: 'first-gear',
     name: 'First Gear',
-    intro:
-      'Rex. Your car is in my impound lot and your debt is on my books. One job and we start even. Steal a car — any car — and bring it to my garage.',
+    reward: 400,
+    intro: "Vera: Rex. You owe me, and the meter is running. First job is simple — take any car on the street and bring it to my garage. Don't scratch it. Much.",
     steps: [
-      { type: 'enterCar', text: 'Steal a car — any car will do. Press E next to one.' },
-      { type: 'goto', x: -150, z: 128, r: 12, text: "Drive it to Vera's Garage." },
+      { type: 'enterCar', text: 'Steal a car — get in any car on the street (E)' },
+      { type: 'deliver', at: PLACES.veraGarage, text: "Deliver the car to Vera's Garage" },
     ],
-    done: 'Vera: "Not bad. The car stays with me until your debt is clear."',
+    done: "Vera: Not bad. The car is clean enough. Four hundred, as promised. Don't spend it all in one place — you still owe me plenty.",
   },
   {
+    id: 'the-pickup',
     name: 'The Pickup',
-    intro:
-      'A package is waiting at the container yard, north docks. Pick it up, bring it to Marina Cafe. Do not open it. Do not drop it. Do not get chatty.',
+    reward: 700,
+    intro: "Vera: A package is waiting at the north docks, container yard. Bring it to Marina Cafe. The yard guards don't like visitors — if they call it in, you'll have company.",
     steps: [
-      { type: 'goto', x: DOCKS.x, z: -250, r: 12, text: 'Pick up the package at the container yard.' },
-      { type: 'goto', x: 120, z: 238, r: 12, text: 'Deliver the package to Marina Cafe.' },
+      { type: 'goto', at: PLACES.containerYard, text: 'Go to the container yard at the north docks' },
+      { type: 'collect', at: PLACES.containerYard, text: 'Pick up the package' },
+      { type: 'deliver', at: PLACES.marinaCafe, text: 'Deliver the package to Marina Cafe' },
     ],
-    done: 'Vera: "Clean. The client sends his regards — and your cut."',
+    done: "Vera: Smooth. Seven hundred. The cafe crowd never saw a thing.",
   },
   {
+    id: 'hot-pursuit',
     name: 'Hot Pursuit',
-    intro:
-      'Change of plan, Rex. The yard guards called your plate in — you have got three stars and every cruiser in the bay. Lose them, then lay low at Palm Court. Do not get caught.',
+    reward: 900,
+    intro: "Vera: The law is on you, Rex — three stars and climbing. Lose them. When the heat is gone, lay low at Palm Court until I call. Drive like you mean it.",
+    startWanted: 3,
     steps: [
-      { type: 'escape', text: 'Lose the cops — get your wanted level to zero.' },
-      { type: 'goto', x: 150, z: 128, r: 12, text: 'Lay low at Palm Court.' },
+      { type: 'escape', text: 'Lose the cops — get your wanted level to zero' },
+      { type: 'laylow', at: PLACES.palmCourt, seconds: 5, text: 'Lay low at Palm Court' },
     ],
-    done: 'Vera: "You drive like the devil himself. I like that in an employee."',
+    done: "Vera: They lost you. Nine hundred. You're learning, Rex.",
   },
   {
+    id: 'the-exchange',
     name: 'The Exchange',
-    intro:
-      'The Tide Kings took my case at the docks and they are not giving it back nicely. Four of them, armed. Take them out, grab the case, bring it home.',
+    reward: 1200,
+    intro: "Vera: The Tide Kings took my case at the docks. Four of them, armed. Take it back — all four — and bring the case to my garage. Watch your back.",
     steps: [
-      { type: 'goto', x: DOCKS.x, z: -250, r: 16, text: 'Meet the Tide Kings at the container yard.' },
-      { type: 'killAll', text: 'Take out the Tide Kings crew.' },
-      { type: 'goto', x: DOCKS.x, z: -250, r: 10, text: 'Grab the case.' },
-      { type: 'goto', x: -150, z: 128, r: 12, text: "Bring the case back to Vera's Garage." },
+      { type: 'goto', at: PLACES.containerYard, text: 'Go to the docks' },
+      { type: 'killAll', text: 'Take out the Tide Kings crew (4)' },
+      { type: 'collect', at: PLACES.containerYard, text: 'Take the case' },
+      { type: 'deliver', at: PLACES.veraGarage, text: "Bring the case to Vera's Garage" },
     ],
-    done: 'Vera: "The case is safe. The Tide Kings will think twice next time."',
+    done: "Vera: The case is mine again. Twelve hundred. One job left, Rex. The big one.",
   },
   {
+    id: 'sunset-run',
     name: 'Sunset Run',
-    intro:
-      'Last job, Rex. The case goes to the lighthouse keeper before sunset — 150 seconds, and the whole bay is watching. Drive like your debt depends on it. It does.',
+    reward: 2000,
+    intro: "Vera: Last run. The case goes to the lighthouse, and it goes now — 150 seconds. The law will be on you from the start. Make it, and your debt is clear.",
+    startWanted: 2,
     steps: [
-      {
-        type: 'goto',
-        x: -120,
-        z: 256,
-        r: 12,
-        text: 'Deliver the case to the lighthouse.',
-        seconds: 150,
-      },
+      { type: 'timed', at: PLACES.lighthouse, seconds: 150, text: 'Deliver the case to the lighthouse — 150 seconds!' },
     ],
-    done: 'Vera: "Debt clear, Rex. The car is yours. Solmar Bay is yours."',
+    done: "Vera: Debt clear, Rex. The car is yours. Solmar Bay is yours.",
   },
 ];
 
-// The Tide Kings stand in the open lanes between the container rows.
-const CREW_SPOTS = [
-  [40, -265],
-  [80, -265],
-  [55, -279],
-  [75, -279],
-];
-
-export function createMissions(scene, G) {
-  // Gold beacon: a light pillar + a floating diamond over the current target.
+export function makeMissions(scene) {
+  // The beacon: a tall light pillar + a floating diamond at the target.
+  const beacon = new THREE.Group();
   const pillar = new THREE.Mesh(
-    new THREE.CylinderGeometry(1.4, 1.4, 34, 12, 1, true),
-    new THREE.MeshBasicMaterial({
-      color: 0xffc24b,
-      transparent: true,
-      opacity: 0.22,
-      side: THREE.DoubleSide,
-      depthWrite: false,
-    }),
+    new THREE.CylinderGeometry(1.6, 2.4, 60, 12, 1, true),
+    new THREE.MeshBasicMaterial({ color: 0xffd76a, transparent: true, opacity: 0.22, side: THREE.DoubleSide, depthWrite: false }),
   );
-  pillar.position.y = 17;
-  const diamond = new THREE.Mesh(
-    new THREE.OctahedronGeometry(1.1),
-    new THREE.MeshBasicMaterial({ color: 0xffc24b, transparent: true, opacity: 0.9 }),
+  pillar.position.y = 30;
+  beacon.add(pillar);
+  const gem = new THREE.Mesh(
+    new THREE.OctahedronGeometry(1.6),
+    new THREE.MeshStandardMaterial({ color: 0xffd76a, emissive: 0xffb020, emissiveIntensity: 1.4, roughness: 0.3 }),
   );
-  scene.add(pillar, diamond);
-  pillar.visible = false;
-  diamond.visible = false;
-
-  let currentIndex = 0;
-  let stepIndex = 0;
-  let timer = 0;
-  let enemiesSpawned = false;
-  let active = false;
-
-  function current() {
-    return MISSIONS[currentIndex];
-  }
-  function step() {
-    return current() ? current().steps[stepIndex] : null;
-  }
-
-  function showBeacon(x, z) {
-    pillar.position.set(x, 17, z);
-    diamond.position.set(x, 7, z);
-    pillar.visible = true;
-    diamond.visible = true;
-  }
-  function hideBeacon() {
-    pillar.visible = false;
-    diamond.visible = false;
-  }
-
-  function startMission(i) {
-    currentIndex = i;
-    stepIndex = 0;
-    timer = 0;
-    enemiesSpawned = false;
-    active = true;
-    const m = current();
-    G.hud.dialogue('Vera', m.intro, 6000);
-    G.hud.toast(`Mission ${i + 1}: ${m.name}`);
-    if (i === 2) G.setWanted(3);
-    if (i === 4) G.setWanted(2);
-    G.audio.mission();
-    enterStep();
-  }
-
-  /** Set up the world for the current step (beacon, crew, timer). */
-  function enterStep() {
-    const s = step();
-    if (!s) return;
-    if (s.type === 'goto' || s.type === 'pickup') {
-      showBeacon(s.x, s.z);
-    } else if (s.type === 'killAll') {
-      hideBeacon();
-      if (!enemiesSpawned) {
-        enemiesSpawned = true;
-        for (const [x, z] of CREW_SPOTS) G.combat.spawnEnemy(x, z);
-        G.hud.toast('Four Tide Kings. They shoot first.');
-      }
-    } else {
-      // enterCar and escape have no marker in the world.
-      hideBeacon();
-    }
-    if (s.seconds) timer = s.seconds;
-  }
-
-  function completeStep() {
-    stepIndex += 1;
-    G.audio.pickup();
-    if (stepIndex >= current().steps.length) completeMission();
-    else enterStep();
-  }
-
-  function completeMission() {
-    const reward = MISSION_REWARDS[currentIndex];
-    G.cash += reward;
-    G.missionsDone[currentIndex] = true;
-    writeSave(G.missionsDone, G.cash);
-    G.hud.banner('Mission complete', `${current().name} — +$${reward}`);
-    G.hud.dialogue('Vera', current().done, 5000);
-    G.audio.mission();
-    active = false;
-    hideBeacon();
-    G.combat.clearEnemies();
-    if (currentIndex + 1 < MISSIONS.length) {
-      const next = currentIndex + 1;
-      // Only chain into the next job if the run is still going: the player
-      // may have been busted, wasted, or quit to the title in the meantime.
-      setTimeout(() => {
-        if (!active && G.screen === 'play') startMission(next);
-      }, 4500);
-    } else {
-      setTimeout(() => {
-        if (G.screen === 'play') {
-          G.hud.banner('Solmar Bay is yours', 'Every job done. The city is your playground now.');
-        }
-      }, 4500);
-    }
-  }
-
-  function failMission(reason) {
-    G.hud.toast(reason);
-    G.hud.dialogue('Vera', 'Again, Rex. From the top.', 4000);
-    G.combat.clearEnemies();
-    startMission(currentIndex);
-  }
-
-  /** Is the current step finished? One predicate per step type. */
-  function stepDone(s, G) {
-    const p = G.player.pos;
-    if (s.type === 'goto') {
-      const d = Math.hypot(p.x - s.x, p.z - s.z);
-      if (d < s.r) {
-        if (currentIndex === 1 && stepIndex === 0) {
-          // Picking up the package at the docks tips off the yard guards.
-          G.setWanted(Math.max(G.wanted, 1));
-          G.hud.dialogue('Vera', 'The yard guards called it in. You have got heat — drive careful.', 4000);
-        }
-        return true;
-      }
-      return false;
-    }
-    if (s.type === 'enterCar') return !!G.driving;
-    if (s.type === 'escape') return G.wanted === 0;
-    if (s.type === 'killAll') return G.combat.enemies.length === 0;
-    return false;
-  }
-
+  gem.position.y = 6;
+  beacon.add(gem);
+  beacon.visible = false;
+  scene.add(beacon);
   return {
-    get currentIndex() {
-      return currentIndex;
-    },
-    activeMission() {
-      return active ? current() : null;
-    },
-    objectiveText() {
-      if (!active) return 'Explore Solmar Bay. Steal a car with E, lose the cops, find work.';
-      const s = step();
-      if (!s) return '';
-      if (s.seconds) return `${s.text} — ${Math.ceil(timer)}s left`;
-      return s.text;
-    },
-    target() {
-      if (!active) return null;
-      const s = step();
-      return s && (s.type === 'goto' || s.type === 'pickup') ? { x: s.x, z: s.z } : null;
-    },
-    startFromSave(missionsDone) {
-      const next = missionsDone.findIndex((d) => !d);
-      if (next === -1) {
-        active = false;
-        return;
-      }
-      startMission(next);
-    },
-    restart() {
-      if (!active) return;
-      G.combat.clearEnemies();
-      G.setWanted(0);
-      startMission(currentIndex);
-    },
-    update(dt) {
-      if (!active) return;
-      const s = step();
-      if (!s) return;
-      diamond.rotation.y += dt * 2;
-      diamond.position.y = 7 + Math.sin(G.time * 2) * 0.5;
-      if (s.seconds) {
-        timer -= dt;
-        if (timer <= 0) {
-          failMission('Too slow — the lighthouse keeper waited for no one.');
-          return;
+    defs: MISSION_DEFS,
+    index: 0, // which mission is active (0..4); 5 = all done
+    step: 0,
+    active: false,
+    started: false,
+    timer: 0,
+    laylowTimer: 0,
+    beacon,
+    gem,
+    crew: [],
+    crewSpawned: false,
+    packageTaken: false,
+    caseTaken: false,
+    cash: 0,
+    completedCount: 0,
+  };
+}
+
+function currentDef(m) {
+  return m.defs[m.index] ?? null;
+}
+
+function currentStep(m) {
+  const d = currentDef(m);
+  return d ? d.steps[m.step] : null;
+}
+
+export function missionObjective(m) {
+  if (!m.active) {
+    if (m.index >= m.defs.length) return 'All missions complete — Solmar Bay is yours.';
+    return 'Talk to Vera to start the next job (press M).';
+  }
+  const s = currentStep(m);
+  if (!s) return '';
+  if (s.type === 'timed') {
+    return `${s.text} — ${Math.max(0, Math.ceil(m.timer))}s left`;
+  }
+  if (s.type === 'killAll') {
+    const left = m.crew.filter((c) => !c.dead).length;
+    return `${s.text} — ${left} left`;
+  }
+  return s.text;
+}
+
+export function missionTarget(m) {
+  const s = currentStep(m);
+  if (!s || !s.at) return null;
+  return s.at;
+}
+
+export function startMission(m, ctx) {
+  const d = currentDef(m);
+  if (!d || m.active) return false;
+  m.active = true;
+  m.started = true;
+  m.step = 0;
+  m.timer = 0;
+  m.laylowTimer = 0;
+  m.crewSpawned = false;
+  m.packageTaken = false;
+  m.caseTaken = false;
+  if (d.startWanted) setWanted(ctx.wanted, d.startWanted);
+  if (d.id === 'sunset-run') m.timer = 150;
+  ctx.say('Vera', d.intro);
+  ctx.setObjective(missionObjective(m));
+  placeBeacon(m);
+  return true;
+}
+
+function placeBeacon(m) {
+  const t = missionTarget(m);
+  if (t) {
+    m.beacon.position.set(t.x, 0, t.z);
+    m.beacon.visible = true;
+  } else {
+    m.beacon.visible = false;
+  }
+}
+
+function advanceStep(m, ctx) {
+  m.step += 1;
+  const d = currentDef(m);
+  if (m.step >= d.steps.length) {
+    completeMission(m, ctx);
+    return;
+  }
+  const s = currentStep(m);
+  if (s.type === 'timed') m.timer = s.seconds;
+  if (s.type === 'laylow') m.laylowTimer = s.seconds;
+  ctx.setObjective(missionObjective(m));
+  placeBeacon(m);
+}
+
+function completeMission(m, ctx) {
+  const d = currentDef(m);
+  m.cash += d.reward;
+  m.completedCount += 1;
+  m.active = false;
+  m.beacon.visible = false;
+  ctx.say('Vera', d.done);
+  ctx.onMissionComplete(d, m.cash);
+  m.index += 1;
+  m.step = 0;
+  if (m.index < m.defs.length) {
+    ctx.setObjective('Job done. Press M for the next job from Vera.');
+  } else {
+    ctx.setObjective('All missions complete — Solmar Bay is yours.');
+  }
+  ctx.save();
+}
+
+function spawnCrew(m, ctx) {
+  if (m.crewSpawned) return;
+  m.crewSpawned = true;
+  const spots = [
+    { x: 30, z: -138 }, { x: 54, z: -152 }, { x: 66, z: -140 }, { x: 44, z: -160 },
+  ];
+  for (const s of spots) {
+    const member = makeCrewMember(s.x, s.z, ctx.scene);
+    member.onDeath = () => {
+      ctx.addHeat(12);
+      ctx.say('Vera', 'One down. Keep going.');
+    };
+    m.crew.push(member);
+  }
+}
+
+// One mission step. ctx: {playerPos, inCar, wanted, scene, say, setObjective,
+// onMissionComplete, save, addHeat, onPlayerHit, damagePlayer}
+export function updateMissions(m, ctx, dt) {
+  // Animate the beacon gem.
+  if (m.beacon.visible) {
+    m.gem.rotation.y += dt * 2;
+    m.gem.position.y = 6 + Math.sin(ctx.time * 2) * 0.6;
+  }
+  if (!m.active) return;
+  const d = currentDef(m);
+  const s = currentStep(m);
+  if (!s) return;
+  const p = ctx.playerPos;
+
+  if (s.type === 'timed') {
+    m.timer -= dt;
+    ctx.setObjective(missionObjective(m));
+    if (m.timer <= 0) {
+      ctx.say('Vera', "Too slow, Rex. The deal is off — but the debt isn't. Try again.");
+      failMission(m, ctx);
+      return;
+    }
+    if (dist2D(p.x, p.z, s.at.x, s.at.z) < 12) {
+      advanceStep(m, ctx);
+      return;
+    }
+  } else if (s.type === 'enterCar') {
+    if (ctx.inCar) advanceStep(m, ctx);
+  } else if (s.type === 'goto' || s.type === 'deliver' || s.type === 'collect') {
+    if (dist2D(p.x, p.z, s.at.x, s.at.z) < 12) {
+      if (s.type === 'collect') {
+        if (d.id === 'the-pickup') {
+          m.packageTaken = true;
+          addHeat(ctx.wanted, 100); // the yard guards call it in
+          ctx.say('Vera', 'Package taken — and the guards called it in. Move!');
+        } else {
+          m.caseTaken = true;
         }
       }
-      if (stepDone(s, G)) completeStep();
-    },
-  };
+      advanceStep(m, ctx);
+    }
+  } else if (s.type === 'escape') {
+    if (ctx.wanted.level === 0) advanceStep(m, ctx);
+  } else if (s.type === 'laylow') {
+    if (dist2D(p.x, p.z, s.at.x, s.at.z) < 10) {
+      m.laylowTimer -= dt;
+      ctx.setObjective(`${s.text} — ${Math.max(0, Math.ceil(m.laylowTimer))}s`);
+      if (m.laylowTimer <= 0) advanceStep(m, ctx);
+    } else {
+      m.laylowTimer = s.seconds;
+      ctx.setObjective(s.text);
+    }
+  } else if (s.type === 'killAll') {
+    spawnCrew(m, ctx);
+    const left = m.crew.filter((c) => !c.dead).length;
+    ctx.setObjective(missionObjective(m));
+    if (left === 0) advanceStep(m, ctx);
+  }
+}
+
+function failMission(m, ctx) {
+  m.active = false;
+  m.beacon.visible = false;
+  m.index = Math.max(0, m.index); // retry the same mission
+  ctx.setObjective('Job failed. Press M to try again.');
+}
+
+// Remove crew members from the scene (when a mission ends or restarts).
+export function clearCrew(m, scene) {
+  for (const c of m.crew) scene.remove(c.mesh);
+  m.crew = [];
+  m.crewSpawned = false;
 }

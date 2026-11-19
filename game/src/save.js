@@ -1,39 +1,53 @@
-// Save: one localStorage row — which missions are done and how much cash
-// Rex is carrying. Nothing else is kept; the city is rebuilt fresh on every
-// visit, and the run starts from the first unfinished job.
-//
-// The loader is deliberately paranoid: a damaged, hand-edited or
-// half-written save must never read as "everything done" or crash the boot.
-// Anything it cannot make sense of degrades to "no save".
-import { SAVE_KEY } from './config.js';
+// Save/load for Solmar Bay: one small JSON record in localStorage, written
+// after every mission (and on quit). It holds the mission index, cash,
+// health and the player's last position — enough to pick up where the
+// player left off. Nothing else is persisted; the city is rebuilt from
+// the fixed seed on every load.
 
-const JOB_COUNT = 5;
+const KEY = 'solmarbay-save-v1';
 
-/** Normalise a parsed save object, or return null when it is unusable. */
-function normaliseSave(data) {
-  if (!data || !Array.isArray(data.missionsDone)) return null;
-  // A short array (older or damaged save) must not read as "all done":
-  // pad missing jobs with false, drop anything past the fifth.
-  const missionsDone = data.missionsDone.slice(0, JOB_COUNT);
-  while (missionsDone.length < JOB_COUNT) missionsDone.push(false);
-  const cash = Number.isFinite(data.cash) ? data.cash | 0 : 0;
-  return { missionsDone, cash };
+export function saveGame(state) {
+  try {
+    const record = {
+      version: 1,
+      missionIndex: state.missionIndex,
+      cash: state.cash,
+      health: state.health,
+      x: state.x,
+      z: state.z,
+      savedAt: new Date().toISOString(),
+    };
+    localStorage.setItem(KEY, JSON.stringify(record));
+    return true;
+  } catch {
+    return false;
+  }
 }
 
-export function readSave() {
+export function loadGame() {
   try {
-    const raw = window.localStorage.getItem(SAVE_KEY);
+    const raw = localStorage.getItem(KEY);
     if (!raw) return null;
-    return normaliseSave(JSON.parse(raw));
+    const record = JSON.parse(raw);
+    if (!record || record.version !== 1) return null;
+    return record;
   } catch {
     return null;
   }
 }
 
-export function writeSave(missionsDone, cash) {
+export function hasSave() {
   try {
-    window.localStorage.setItem(SAVE_KEY, JSON.stringify({ missionsDone, cash }));
+    return localStorage.getItem(KEY) !== null;
   } catch {
-    // Storage can be off (private mode, quota): the run just lasts this visit.
+    return false;
+  }
+}
+
+export function clearSave() {
+  try {
+    localStorage.removeItem(KEY);
+  } catch {
+    // Storage unavailable — the game still plays, it just won't persist.
   }
 }
