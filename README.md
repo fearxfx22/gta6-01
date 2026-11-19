@@ -29,42 +29,13 @@ Rex came to Solmar Bay with a debt and a borrowed name. **Vera Solano** owns the
 | Key | Action |
 | --- | --- |
 | WASD | Move / drive |
-| Shift | Run |
-| Space | Jump |
-| Mouse | Look |
+| Mouse | Look around (click to lock) |
 | Click | Shoot |
 | E | Steal / exit car |
 | R | Reload |
-| M | Start the next job from Vera |
-| P / Esc | Pause |
+| Shift | Sprint |
+| P | Pause |
 
-## Play it
+## Run it
 
-Serve `game/` with any static server and open `index.html` in desktop Chrome:
-
-```sh
-cd game && python3 -m http.server 8080
-```
-
-No build step, no network requests — every file the game loads lives under `game/`. The three.js library is vendored at `game/vendor/three.module.min.js`.
-
-## Structure
-
-- `main.ts` — the entry program: copies `game/` and `screenshots/` to `/output` and writes `dossier.json`.
-- `game/index.html` + `game/style.css` — the page and the HUD styling.
-- `game/src/boot.js` — renderer, sunset lighting, input, the game loop, and the `?shot=` screenshot presets.
-- `game/src/city.js` — the city, beach, docks, marina, lighthouse, and props.
-- `game/src/vehicles.js` — car factory and arcade drive physics.
-- `game/src/traffic.js` — traffic AI and pedestrian routines.
-- `game/src/player.js` — Rex on foot.
-- `game/src/police.js` — the wanted system and police chases.
-- `game/src/weapons.js` — the hitscan pistol and the enemy crew.
-- `game/src/missions.js` — the five jobs, Vera's dialogue, and the rewards.
-- `game/src/hud.js` — HUD, minimap, menus, and messages.
-- `game/src/save.js` — localStorage saves.
-- `game/src/camera.js` — the third-person follow camera.
-- `game/src/util.js` — the seeded RNG and world constants.
-
-## License
-
-MIT — see [LICENSE](LICENSE).
+Serve `game/` with any static file server and open `index.html`. No build step, no network.

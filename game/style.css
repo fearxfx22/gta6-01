@@ -1,56 +1,78 @@
-/* Solmar Bay HUD + menus: warm sunset type, glassy dark panels, readable
-   at a glance. The 3D canvas is fullscreen underneath; every panel is
-   pointer-events:none except the buttons. */
-
+/* Solmar Bay — sunset HUD. System fonts only, no network. */
 * { box-sizing: border-box; margin: 0; padding: 0; }
-html, body { width: 100%; height: 100%; overflow: hidden; background: #1a1a20; font-family: 'Segoe UI', system-ui, sans-serif; }
+html, body { width: 100%; height: 100%; overflow: hidden; background: #1a1426;
+  font-family: 'Trebuchet MS', Verdana, sans-serif; color: #fff; }
 #game { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+#hud { position: fixed; inset: 0; pointer-events: none; }
 
-#hud { position: fixed; inset: 0; pointer-events: none; color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,0.8); z-index: 5; }
+#hud-tl { position: absolute; top: 14px; left: 14px; }
+#hud-health { width: 220px; height: 20px; background: rgba(0,0,0,0.55);
+  border: 1px solid rgba(255,255,255,0.35); border-radius: 3px; position: relative; overflow: hidden; }
+#hud-health-fill { height: 100%; width: 100%; background: #7ac74f; transition: width 0.2s; }
+#hud-health-num { position: absolute; right: 6px; top: 1px; font-size: 13px; font-weight: bold;
+  text-shadow: 0 1px 2px #000; }
+#hud-cash { font-size: 26px; font-weight: bold; color: #7ac74f; margin-top: 6px;
+  text-shadow: 0 2px 3px #000; }
+#hud-mission { font-size: 13px; letter-spacing: 2px; color: #ffd9a0; margin-top: 2px;
+  text-shadow: 0 1px 2px #000; }
 
-#top-left { position: absolute; top: 14px; left: 16px; }
-#health-bar { width: 210px; height: 14px; background: rgba(0,0,0,0.55); border: 1px solid rgba(255,255,255,0.35); border-radius: 3px; overflow: hidden; }
-#health-fill { height: 100%; width: 100%; background: #7dc86a; transition: width 0.2s; }
-#health-text { font-size: 12px; margin-top: 2px; color: #e8e8e8; }
-#stars { font-size: 24px; letter-spacing: 3px; color: #ffd76a; margin-top: 4px; }
-#cash { font-size: 22px; font-weight: 700; color: #7dc86a; margin-top: 2px; }
-#location { font-size: 13px; color: #ffd98a; letter-spacing: 1px; text-transform: uppercase; }
+#hud-tr { position: absolute; top: 14px; right: 16px; text-align: right; }
+#hud-stars { font-size: 26px; letter-spacing: 3px; color: #ffd94d; text-shadow: 0 2px 3px #000; }
+#hud-heat { font-size: 13px; font-weight: bold; letter-spacing: 3px; color: #ff5a4a;
+  text-shadow: 0 1px 2px #000; }
 
-#top-right { position: absolute; top: 14px; right: 16px; text-align: right; }
-#minimap { border: 2px solid rgba(255,255,255,0.4); border-radius: 50%; background: #20242a; box-shadow: 0 2px 12px rgba(0,0,0,0.5); }
-#ammo { font-size: 16px; font-weight: 600; margin-top: 6px; }
+#hud-objective { position: absolute; top: 12px; left: 50%; transform: translateX(-50%);
+  text-align: center; max-width: 560px; }
+#hud-obj-title { font-size: 15px; font-weight: bold; letter-spacing: 2px; color: #ffc94d;
+  text-shadow: 0 2px 3px #000; }
+#hud-obj-text { font-size: 17px; margin-top: 2px; text-shadow: 0 2px 3px #000; }
+#hud-obj-timer { font-size: 30px; font-weight: bold; color: #ff5a4a; text-shadow: 0 2px 4px #000; }
 
-#objective { position: absolute; top: 16px; left: 50%; transform: translateX(-50%); max-width: 560px; text-align: center; font-size: 16px; font-weight: 600; background: rgba(0,0,0,0.55); padding: 8px 18px; border-radius: 4px; border-left: 4px solid #ffd76a; }
+#hud-compass { position: absolute; top: 86px; left: 50%; margin-left: -12px; font-size: 24px;
+  color: #ffc94d; text-shadow: 0 0 6px #000; transition: opacity 0.3s; opacity: 0; }
 
-#messages { position: absolute; left: 16px; bottom: 90px; max-width: 420px; }
-.message { background: rgba(0,0,0,0.6); padding: 7px 12px; margin-top: 6px; border-radius: 4px; font-size: 14px; border-left: 3px solid #ffd76a; }
+#hud-dialogue { position: absolute; left: 50%; bottom: 120px; transform: translateX(-50%);
+  width: min(620px, 86vw); background: rgba(10,8,20,0.82); border-left: 4px solid #ffc94d;
+  padding: 12px 16px; border-radius: 4px; opacity: 0; transition: opacity 0.4s; }
+#hud-dialogue.show { opacity: 1; }
+#hud-speaker { font-size: 13px; font-weight: bold; letter-spacing: 2px; color: #ffc94d; }
+#hud-say { font-size: 16px; margin-top: 4px; line-height: 1.45; }
 
-#dialogue { position: absolute; left: 50%; bottom: 110px; transform: translateX(-50%); width: 620px; max-width: 86vw; background: rgba(10,10,16,0.82); border: 1px solid rgba(255,217,138,0.5); border-radius: 6px; padding: 12px 16px; display: none; }
-#dialogue-name { display: block; color: #ffd76a; font-weight: 700; font-size: 14px; margin-bottom: 4px; }
-#dialogue-text { font-size: 15px; line-height: 1.45; color: #f0ead8; }
+#hud-toast { position: absolute; left: 50%; top: 34%; transform: translateX(-50%);
+  font-size: 26px; font-weight: bold; letter-spacing: 1px; color: #fff;
+  text-shadow: 0 2px 6px #000; opacity: 0; transition: opacity 0.3s; text-align: center; }
+#hud-toast.show { opacity: 1; }
 
-#prompt { position: absolute; left: 50%; bottom: 170px; transform: translateX(-50%); background: rgba(0,0,0,0.65); padding: 7px 14px; border-radius: 4px; font-size: 14px; display: none; }
+#hud-bl { position: absolute; left: 14px; bottom: 14px; }
+#hud-map { border: 2px solid rgba(255,255,255,0.4); border-radius: 4px;
+  background: #1a2432; box-shadow: 0 2px 8px rgba(0,0,0,0.6); }
 
-#crosshair { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); font-size: 22px; color: rgba(255,255,255,0.85); }
+#hud-br { position: absolute; right: 16px; bottom: 14px; text-align: right; }
+#hud-ammo { font-size: 30px; font-weight: bold; text-shadow: 0 2px 3px #000; }
+#hud-ammo span { font-size: 16px; color: #ccc; }
+#hud-reload { font-size: 14px; font-weight: bold; color: #ffc94d; text-shadow: 0 1px 2px #000; }
+#hud-hint { font-size: 12px; color: rgba(255,255,255,0.75); margin-top: 6px;
+  text-shadow: 0 1px 2px #000; }
 
-#controls-hint { position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%); font-size: 12px; color: rgba(255,255,255,0.65); white-space: nowrap; }
+#hud-vignette { position: absolute; inset: 0; pointer-events: none;
+  box-shadow: inset 0 0 120px rgba(255,0,0,0); transition: box-shadow 0.15s; }
+#hud-vignette.hurt { box-shadow: inset 0 0 140px rgba(255,30,20,0.75); }
 
-/* Menus: full-screen overlays with a warm gradient. */
-#title-screen, #pause-screen, #complete-screen, #busted-screen, #gameover-screen {
-  position: fixed; inset: 0; z-index: 10; display: flex; flex-direction: column;
-  align-items: center; justify-content: center; text-align: center; color: #fff;
-  background: linear-gradient(180deg, rgba(20,12,30,0.72), rgba(60,20,10,0.78));
-  text-shadow: 0 2px 8px rgba(0,0,0,0.7);
-}
-#title-screen h1 { font-size: 84px; letter-spacing: 10px; color: #ffd76a; font-weight: 900; }
-#title-screen .tagline { font-size: 20px; color: #ffb08a; margin: 8px 0 18px; font-style: italic; }
-#title-screen .story { max-width: 560px; font-size: 15px; line-height: 1.6; color: #e8e0d0; margin-bottom: 28px; }
-#title-screen .keys { margin-top: 22px; font-size: 13px; color: rgba(255,255,255,0.65); }
-button { pointer-events: auto; cursor: pointer; font-size: 18px; font-weight: 700; color: #1a1a20; background: #ffd76a; border: none; border-radius: 4px; padding: 12px 34px; margin: 6px; box-shadow: 0 3px 0 #b88a2e; }
-button:hover { background: #ffe08a; }
-button.small { font-size: 13px; padding: 7px 16px; background: transparent; color: rgba(255,255,255,0.7); box-shadow: none; border: 1px solid rgba(255,255,255,0.4); margin-top: 26px; }
-#pause-screen h2, #busted-screen h2, #gameover-screen h2 { font-size: 56px; letter-spacing: 6px; color: #ffd76a; }
-#busted-screen h2 { color: #5a8aff; }
-#gameover-screen h2 { color: #ff5040; }
-#complete-screen h2 { font-size: 44px; color: #7dc86a; }
-#complete-screen p, #pause-screen p, #busted-screen p, #gameover-screen p { font-size: 17px; margin: 12px 0 20px; max-width: 520px; line-height: 1.5; }
+.screen { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  background: radial-gradient(ellipse at center, rgba(10,6,20,0.25) 0%, rgba(10,6,20,0.72) 100%);
+  pointer-events: auto; }
+.screen.hidden { display: none; }
+.screen-inner { text-align: center; max-width: 640px; padding: 24px; }
+.screen-inner h1 { font-size: 64px; letter-spacing: 8px; color: #ffc94d;
+  text-shadow: 0 4px 0 #7a2a3a, 0 8px 24px #000; }
+.screen-inner .tag { font-size: 17px; margin: 14px 0 22px; line-height: 1.5;
+  text-shadow: 0 2px 4px #000; }
+.screen-inner button { pointer-events: auto; cursor: pointer; font-family: inherit;
+  font-size: 20px; font-weight: bold; letter-spacing: 3px; color: #1a1426;
+  background: #ffc94d; border: none; border-radius: 4px; padding: 14px 34px;
+  box-shadow: 0 4px 0 #b98a2a, 0 8px 20px rgba(0,0,0,0.6); }
+.screen-inner button:active { transform: translateY(3px); box-shadow: 0 1px 0 #b98a2a; }
+.controls { margin-top: 22px; font-size: 14px; line-height: 1.9; color: rgba(255,255,255,0.85);
+  text-shadow: 0 1px 2px #000; }
+.controls b { color: #ffc94d; }
+#hud-save-note { margin-top: 14px; font-size: 13px; color: #7ac74f; text-shadow: 0 1px 2px #000; }

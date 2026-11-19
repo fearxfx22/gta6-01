@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<link rel="icon" href="data:,">
 <title>Solmar Bay — an open-world crime game</title>
-<link rel="stylesheet" href="style.css">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="./style.css">
 <script type="importmap">
 {
   "imports": {
@@ -16,67 +16,7 @@
 </head>
 <body>
 <canvas id="game"></canvas>
-
-<!-- In-game HUD -->
-<div id="hud" style="display:none">
-  <div id="top-left">
-    <div id="health-bar"><div id="health-fill"></div></div>
-    <div id="health-text">100</div>
-    <div id="stars">☆☆☆☆☆</div>
-    <div id="cash">$0</div>
-    <div id="location">Old Town</div>
-  </div>
-  <div id="top-right">
-    <canvas id="minimap" width="148" height="148"></canvas>
-    <div id="ammo">◉ 12 / 60</div>
-  </div>
-  <div id="objective"></div>
-  <div id="messages"></div>
-  <div id="dialogue"><span id="dialogue-name">Vera</span><span id="dialogue-text"></span></div>
-  <div id="prompt"></div>
-  <div id="crosshair">+</div>
-  <div id="controls-hint">WASD move · Shift run · Space jump · E enter/exit car · Click shoot · R reload · M mission · P pause</div>
-</div>
-
-<!-- Title screen -->
-<div id="title-screen">
-  <h1>SOLMAR BAY</h1>
-  <p class="tagline">You owe Vera Solano. Five jobs. One way out.</p>
-  <p class="story">Rex came to Solmar Bay with a debt and a borrowed name. Vera owns the garage, the docks, and — for now — Rex. Pay her back, job by job, or the city eats you.</p>
-  <button id="start-btn">New Game</button>
-  <button id="continue-btn" style="display:none">Continue</button>
-  <p class="keys">WASD move · Shift run · Space jump · E steal / exit car · Mouse aim · Click shoot · R reload · M start job · P pause</p>
-  <button id="title-restart-btn" class="small">Erase save</button>
-</div>
-
-<!-- Pause menu -->
-<div id="pause-screen" style="display:none">
-  <h2>Paused</h2>
-  <p>Solmar Bay waits for no one. Except now.</p>
-  <button id="resume-btn">Resume</button>
-  <button id="restart-btn">Restart from save</button>
-</div>
-
-<!-- Mission complete card -->
-<div id="complete-screen" style="display:none">
-  <h2 id="complete-title">Job complete</h2>
-  <p id="complete-text"></p>
-</div>
-
-<!-- Busted -->
-<div id="busted-screen" style="display:none">
-  <h2>BUSTED</h2>
-  <p>The Solmar Bay police took their cut. $150 fine.</p>
-  <button id="busted-btn">Walk it off</button>
-</div>
-
-<!-- Game over -->
-<div id="gameover-screen" style="display:none">
-  <h2>WASTED</h2>
-  <p>Rex went down in Solmar Bay.</p>
-  <button id="restart-btn-2" onclick="location.reload()">Try again</button>
-</div>
-
-<script type="module" src="./src/boot.js"></script>
+<div id="hud"></div>
+<script type="module" src="./src/engine.js"></script>
 </body>
 </html>
